@@ -2,10 +2,10 @@ package com.railconnect.common.enums;
 
 public enum CoachType {
     SLEEPER,
-    AC1,
-    AC2,
-    AC3,
-    AC_CHAIR,
+    FIRST_AC,
+    SECOND_AC,
+    THIRD_AC,
+    AC_CHAIR_CAR,
     SECOND_SITTING,
     GENERAL
 }
