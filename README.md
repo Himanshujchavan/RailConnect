@@ -2,6 +2,7 @@
 
 RailConnect is a Vite + React frontend for a train booking experience. It uses plain JavaScript, Tailwind CSS, and a lightweight component stack for the booking flow, account pages, dashboards, and feature screens.
 
+
 ## Tech Stack
 
 React Router DOM, Axios, TanStack Query, TanStack Table, React Hook Form + Zod, Framer Motion, Lucide React, Sonner, next-themes, Recharts, React Day Picker, Embla Carousel, qrcode.react, jsPDF + html2canvas, react-loading-skeleton, clsx, class-variance-authority, tailwind-merge, and Tailwind CSS.
