@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-bg text-secondary font-body antialiased;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: "Poppins", sans-serif;
+}
+
+::selection {
+  background: #DBEAFE;
+}
+
+/* thin scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 99px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.dashed-sep {
+  border-top: 1px dashed #E2E8F0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
