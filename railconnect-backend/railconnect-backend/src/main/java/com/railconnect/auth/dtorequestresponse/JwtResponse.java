@@ -9,6 +9,8 @@ public class JwtResponse {
     private String username;
     private String email;
     private List<String> roles;
+    private String refreshToken;
+    private long expiresIn;
 
     public JwtResponse(String accessToken, Long id, String username, String email, List<String> roles) {
         this.token = accessToken;
@@ -17,6 +19,19 @@ public class JwtResponse {
         this.email = email;
         this.roles = roles;
     }
+
+    /** Used for the /refresh endpoint, which only needs a fresh token pair, not full user details. */
+    public JwtResponse(String accessToken, String refreshToken, long expiresIn) {
+        this.token = accessToken;
+        this.refreshToken = refreshToken;
+        this.expiresIn = expiresIn;
+    }
+
+    public String getRefreshToken() { return refreshToken; }
+    public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
+
+    public long getExpiresIn() { return expiresIn; }
+    public void setExpiresIn(long expiresIn) { this.expiresIn = expiresIn; }
 
     // Getters and Setters
     public String getToken() { return token; }

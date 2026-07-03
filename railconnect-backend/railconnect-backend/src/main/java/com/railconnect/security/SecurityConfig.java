@@ -19,16 +19,15 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
-
-    private final CustomUserDetailsService userDetailsService;
     private final CustomAuthenticationEntryPoint unauthorizedHandler;
+    private final CustomAccessDeniedHandler accessDeniedHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    public SecurityConfig(CustomUserDetailsService userDetailsService,
-                          CustomAuthenticationEntryPoint unauthorizedHandler,
+    public SecurityConfig(CustomAuthenticationEntryPoint unauthorizedHandler,
+                          CustomAccessDeniedHandler accessDeniedHandler,
                           JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.userDetailsService = userDetailsService;
         this.unauthorizedHandler = unauthorizedHandler;
+        this.accessDeniedHandler = accessDeniedHandler;
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
@@ -46,13 +45,18 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
-            .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
+            .exceptionHandling(exception -> exception
+                    .authenticationEntryPoint(unauthorizedHandler)
+                    .accessDeniedHandler(accessDeniedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Allow public access to Auth endpoints and API docs
+                // Anyone: auth endpoints + API docs
                 .requestMatchers(APIConstants.AUTH_API + "/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                // Secure all other functional routes
+                // Admin only
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                // Authenticated user: everything else functional
+                // (/user/**, /booking/**, /payment/**, /notification/**, etc.)
                 .anyRequest().authenticated()
             );
 

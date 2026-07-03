@@ -24,27 +24,68 @@ public class JwtService {
         this.jwtSecretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
+    // ---- Access token ----
+
     public String generateToken(Authentication authentication) {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
+        return generateToken(userPrincipal.getUsername());
+    }
+
+    public String generateToken(String username) {
+        return buildToken(username, SecurityConstants.JWT_EXPIRATION_MS);
+    }
+
+    // ---- Refresh token ----
+    // Note: this issues a self-contained JWT with a longer expiry, used as the *signature*
+    // check for a refresh token. The actual revocation/lookup source of truth is the
+    // RefreshToken row in the database (see RefreshTokenService) — this token's JWT
+    // signature alone does not mean it's still valid, only that it hasn't been tampered with.
+
+    public String generateRefreshToken(Authentication authentication) {
+        UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
+        return generateRefreshToken(userPrincipal.getUsername());
+    }
+
+    public String generateRefreshToken(String username) {
+        return buildToken(username, SecurityConstants.REFRESH_TOKEN_EXPIRATION_MS);
+    }
+
+    private String buildToken(String subject, long expirationMs) {
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + SecurityConstants.JWT_EXPIRATION_MS);
+        Date expiryDate = new Date(now.getTime() + expirationMs);
 
         return Jwts.builder()
-                .subject(userPrincipal.getUsername())
+                .subject(subject)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(jwtSecretKey)
                 .compact();
     }
 
-    public String getUsernameFromToken(String token) {
+    // ---- Reading claims ----
+
+    public String extractUsername(String token) {
+        return parseClaims(token).getSubject();
+    }
+
+    public boolean isExpired(String token) {
+        try {
+            Date expiration = parseClaims(token).getExpiration();
+            return expiration.before(new Date());
+        } catch (ExpiredJwtException ex) {
+            return true;
+        }
+    }
+
+    private Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(jwtSecretKey)
                 .build()
                 .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
+                .getPayload();
     }
+
+    // ---- Validation ----
 
     public boolean validateToken(String token) {
         try {
