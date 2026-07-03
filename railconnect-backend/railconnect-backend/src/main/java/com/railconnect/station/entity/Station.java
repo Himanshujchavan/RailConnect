@@ -19,7 +19,7 @@ public class Station {
     private Long id;
 
     @NotBlank
-    @Size(max = 3)
+    @Size(max = 4)
     @Column(unique = true, nullable = false, length = 3)
     private String stationCode;
 
