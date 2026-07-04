@@ -11,10 +11,16 @@ import java.util.List;
 
 @Repository
 public interface SeatAllocationRepository extends JpaRepository<SeatAllocation, Long> {
-	@Query("SELECT sa FROM SeatAllocation sa WHERE sa.schedule.id = :scheduleId " +
-		   "AND sa.journeyDate = :journeyDate AND sa.status IN ('BOOKED', 'HELD')")
-	List<SeatAllocation> findOccupiedSeats(
-			@Param("scheduleId") Long scheduleId,
-			@Param("journeyDate") LocalDate journeyDate
-	);
+
+    @Query("""
+        SELECT sa
+        FROM SeatAllocation sa
+        WHERE sa.schedule.id = :scheduleId
+        AND sa.journeyDate = :journeyDate
+        AND sa.status IN ('BOOKED', 'HELD')
+    """)
+    List<SeatAllocation> findOccupiedSeats(
+            @Param("scheduleId") Long scheduleId,
+            @Param("journeyDate") LocalDate journeyDate
+    );
 }

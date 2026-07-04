@@ -1,7 +1,6 @@
 package com.railconnect.train.service;
 
 import com.railconnect.entity.Coach;
-import com.railconnect.entity.Seat;
 import com.railconnect.entity.Train;
 import com.railconnect.train.repository.CoachRepository;
 import com.railconnect.train.repository.TrainRepository;

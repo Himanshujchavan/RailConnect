@@ -7,6 +7,7 @@ import com.railconnect.entity.BookingPassenger;
 import com.railconnect.entity.Coach;
 import com.railconnect.entity.PNR;
 import com.railconnect.entity.Passenger;
+import com.railconnect.entity.SeatAllocation;
 import com.railconnect.entity.User;
 import com.railconnect.reservation.repository.BookingPassengerRepository;
 import com.railconnect.reservation.repository.BookingRepository;
@@ -72,20 +73,24 @@ public class BookingServiceImpl implements BookingService {
         trainRepository.findById(coach.getTrain().getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Train not found"));
 
-        List<Long> seatIds = seatAllocationService.allocateSeats(
+        List<SeatAllocation> allocations =
+        seatAllocationService.allocateSeats(
                 request.scheduleId(),
-                request.coachId(),
+                coach.getTrain().getId(), // trainId
                 request.journeyDate(),
                 request.seatPreference(),
                 request.passengers().size()
         );
 
+List<Long> seatIds = allocations.stream()
+        .map(a -> a.getSeat().getId())
+        .toList();
         Booking booking = new Booking();
         booking.createdAt = LocalDateTime.now();
         booking.status = com.railconnect.common.enums.BookingStatus.CONFIRMED;
         booking.user = user;
         booking.scheduleId = request.scheduleId();
-        booking.coachId = request.coachId();
+        booking.coachId = coach.getTrain().getId();
         booking.journeyDate = request.journeyDate();
         booking.totalFare = fareService.calculateFare(coach.getCoachType(), request.passengers().size());
 

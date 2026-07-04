@@ -1,17 +1,13 @@
 package com.railconnect.reservation.service;
 
-import com.railconnect.common.enums.BerthType;
 import com.railconnect.common.util.SeatAllocationUtil;
+import com.railconnect.entity.Coach;
 import com.railconnect.entity.Seat;
 import com.railconnect.entity.SeatAllocation;
-import com.railconnect.entity.Schedule;
-import com.railconnect.train.repository.SeatRepository;
-import com.railconnect.train.repository.ScheduleRepository;
 import com.railconnect.reservation.repository.SeatAllocationRepository;
-import org.springframework.http.HttpStatus;
+import com.railconnect.train.repository.CoachRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -23,101 +19,109 @@ import java.util.stream.Collectors;
 @Service
 public class SeatAllocationServiceImpl implements SeatAllocationService {
 
-    private final SeatRepository seatRepository;
-    private final ScheduleRepository scheduleRepository;
+    private final CoachRepository coachRepository;
     private final SeatAllocationRepository seatAllocationRepository;
 
-    public SeatAllocationServiceImpl(SeatRepository seatRepository,
-                                     ScheduleRepository scheduleRepository,
-                                     SeatAllocationRepository seatAllocationRepository) {
-        this.seatRepository = seatRepository;
-        this.scheduleRepository = scheduleRepository;
+    public SeatAllocationServiceImpl(
+            CoachRepository coachRepository,
+            SeatAllocationRepository seatAllocationRepository) {
+
+        this.coachRepository = coachRepository;
         this.seatAllocationRepository = seatAllocationRepository;
     }
 
+    /**
+     * Main seat allocation API.
+     * Currently delegates to family allocation.
+     * Later this will support:
+     * - Berth preference
+     * - RAC
+     * - Waiting List
+     */
     @Override
     @Transactional
-    public List<Long> allocateSeats(Long scheduleId, Long coachId, LocalDate journeyDate, String preference, int passengerCount) {
-        List<Seat> coachSeats = seatRepository.findByCoachId(coachId);
-        if (coachSeats.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Coach not found");
-        }
+    public List<SeatAllocation> allocateSeats(
+            Long scheduleId,
+            Long trainId,
+            LocalDate journeyDate,
+            String berthPreference,
+            int passengerCount) {
 
-        Schedule schedule = scheduleRepository.findById(scheduleId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Schedule not found"));
+        // TODO:
+        // Convert berthPreference String -> BerthType
+        // Apply preferred berth allocation.
 
-        Set<Long> occupiedSeatIds = seatAllocationRepository.findOccupiedSeats(scheduleId, journeyDate).stream()
-            .map(allocation -> allocation.getSeat().getId())
-                .collect(Collectors.toSet());
+        return allocateFamilySeats(
+                scheduleId,
+                trainId,
+                journeyDate,
+                passengerCount
+        );
+    }
 
-        List<SeatAllocationUtil.SeatInfo> availableSeats = coachSeats.stream()
-                .filter(seat -> !occupiedSeatIds.contains(seat.getId()))
-                .map(SeatSeatInfo::new)
+    @Override
+    @Transactional
+    public List<SeatAllocation> allocateFamilySeats(
+            Long scheduleId,
+            Long trainId,
+            LocalDate journeyDate,
+            int partySize) {
+
+        List<Coach> coaches = coachRepository.findByTrainId(trainId);
+
+        List<Seat> allPhysicalSeats = coaches.stream()
+                .filter(Coach::getIsActive)
+                .flatMap(coach -> coach.getSeats().stream())
                 .toList();
 
-        if (availableSeats.size() < passengerCount) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Not enough seats available");
+        List<SeatAllocation> occupiedSeats =
+                seatAllocationRepository.findOccupiedSeats(
+                        scheduleId,
+                        journeyDate
+                );
+
+        Set<Long> bookedSeatIds = occupiedSeats.stream()
+                .map(sa -> sa.getSeat().getId())
+                .collect(Collectors.toSet());
+
+        List<SeatAllocationUtil.SeatInfo> availableSeats = allPhysicalSeats.stream()
+                .filter(seat -> !bookedSeatIds.contains(seat.getId()))
+                .map(seat -> new SeatAllocationUtil.SeatInfo(
+                        seat.getId(),
+                        seat.getCoach().getId(),
+                        seat.getCoach().getCoachNumber(),
+                        seat.getSeatNumber(),
+                        seat.getBerthType()
+                ))
+                .toList();
+
+        List<SeatAllocationUtil.SeatInfo> selectedSeats =
+                SeatAllocationUtil.computeOptimalAllocations(
+                        availableSeats,
+                        partySize
+                );
+
+        Set<Long> selectedSeatIds = selectedSeats.stream()
+                .map(SeatAllocationUtil.SeatInfo::getSeatId)
+                .collect(Collectors.toSet());
+
+        List<SeatAllocation> allocations = new ArrayList<>();
+
+        for (Seat seat : allPhysicalSeats) {
+
+            if (selectedSeatIds.contains(seat.getId())) {
+
+                SeatAllocation allocation = SeatAllocation.builder()
+                        .seat(seat)
+                        .journeyDate(journeyDate)
+                        .allocatedAt(LocalDateTime.now())
+                        .status("BOOKED") // Later replace with enum
+                        .build();
+
+                allocations.add(allocation);
+            }
         }
 
-        BerthType berthPreference = parsePreference(preference);
-        List<Long> selectedSeatIds = SeatAllocationUtil.filterSeatsByPreference(availableSeats, berthPreference, passengerCount);
-        if (selectedSeatIds.size() < passengerCount) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Unable to allocate requested seats");
-        }
-
-        List<Long> allocatedSeatIds = new ArrayList<>();
-        for (Long seatId : selectedSeatIds) {
-            Seat seat = coachSeats.stream()
-                    .filter(candidate -> candidate.getId().equals(seatId))
-                    .findFirst()
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Seat not found"));
-
-            SeatAllocation allocation = SeatAllocation.builder()
-                    .seat(seat)
-                    .schedule(schedule)
-                    .journeyDate(journeyDate)
-                    .allocatedAt(LocalDateTime.now())
-                    .status("BOOKED")
-                    .build();
-            seatAllocationRepository.save(allocation);
-            allocatedSeatIds.add(seatId);
-        }
-
-        return allocatedSeatIds;
-    }
-
-    @Override
-    @Transactional
-    public void releaseSeat(Long seatId, Long scheduleId, LocalDate journeyDate) {
-        List<SeatAllocation> allocations = seatAllocationRepository.findOccupiedSeats(scheduleId, journeyDate);
-        allocations.stream()
-            .filter(allocation -> allocation.getSeat() != null && seatId.equals(allocation.getSeat().getId()))
-            .forEach(allocation -> allocation.setStatus("CANCELLED"));
-        seatAllocationRepository.saveAll(allocations);
-    }
-
-    private BerthType parsePreference(String preference) {
-        if (preference == null || preference.isBlank()) {
-            return null;
-        }
-        return BerthType.valueOf(preference.trim().toUpperCase().replace(' ', '_'));
-    }
-
-    private static final class SeatSeatInfo implements SeatAllocationUtil.SeatInfo {
-        private final Seat seat;
-
-        private SeatSeatInfo(Seat seat) {
-            this.seat = seat;
-        }
-
-        @Override
-        public Long getSeatId() {
-            return seat.getId();
-        }
-
-        @Override
-        public BerthType getBerthType() {
-            return BerthType.valueOf(seat.getBerthType().trim().replace(' ', '_'));
-        }
+        return seatAllocationRepository.saveAll(allocations);
     }
 }

@@ -1,13 +1,15 @@
 package com.railconnect.entity;
 
+import com.railconnect.common.enums.BerthType;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 @Entity
-@Table(name = "seats",
-       uniqueConstraints = @UniqueConstraint(columnNames = {"coach_id", "seat_number"}))
+@Table(
+    name = "seats",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"coach_id", "seat_number"})
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -26,13 +28,13 @@ public class Seat {
 
     @NotNull
     @Column(name = "seat_number", nullable = false)
-    private Integer seatNumber; // e.g., 1, 2, 3...
+    private Integer seatNumber;
+    
+@NotNull
+@Enumerated(EnumType.STRING)
+@Column(name = "berth_type", nullable = false)
+private BerthType berthType;
 
-    @NotBlank
-    @Column(name = "berth_type", nullable = false)
-    private String berthType; // LOWER, UPPER, MIDDLE, SIDE LOWER, SIDE UPPER
-
-    @NotBlank
     @Column(name = "seat_label", nullable = false)
-    private String seatLabel; // e.g., "1 LB", "2 UB", "7 SL"
+    private String seatLabel;
 }
