@@ -48,20 +48,13 @@ public class SeatAvailabilityServiceImpl implements SeatAvailabilityService {
 
         return coachSeats.stream()
                 .filter(seat -> !occupiedSeatIds.contains(seat.getId()))
-                .map(seat -> new SeatAvailabilityResponse(
-                        seat.getId(),
-                        String.valueOf(seat.getSeatNumber()),
-                        toBerthType(seat.getBerthType()),
-                        seat.getCoach().getCoachNumber(),
-                        true
-                ))
+              .map(seat -> new SeatAvailabilityResponse(
+        seat.getId(),
+        String.valueOf(seat.getSeatNumber()),
+        seat.getBerthType(),
+        seat.getCoach().getCoachNumber(),
+        true
+))
                 .toList();
-    }
-
-    private BerthType toBerthType(String berthType) {
-        if (berthType == null) {
-            return null;
-        }
-        return BerthType.valueOf(berthType.trim().replace(' ', '_'));
     }
 }
