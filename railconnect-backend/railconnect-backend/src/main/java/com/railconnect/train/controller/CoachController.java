@@ -26,7 +26,14 @@ public class CoachController {
         return new ResponseEntity<>(createdCoach, HttpStatus.CREATED);
     }
 
-    @GetMapping("/coaches/train/{trainId}")
+    @PutMapping("/admin/coaches/{id}")
+    public ResponseEntity<CoachResponse> updateCoach(
+            @PathVariable Long id,
+            @Valid @RequestBody CoachRequest request) {
+        return ResponseEntity.ok(coachService.updateCoach(id, request));
+    }
+
+    @GetMapping("/coaches/{trainId}")
     public ResponseEntity<List<CoachResponse>> getCoachesByTrain(@PathVariable Long trainId) {
         return ResponseEntity.ok(coachService.getCoachesByTrain(trainId));
     }

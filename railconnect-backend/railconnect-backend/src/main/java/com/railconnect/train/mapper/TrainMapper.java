@@ -45,10 +45,10 @@ public interface TrainMapper {
     // --- Relationship Unwrapping Helpers ---
 
     default Long map(Coach coach) {
-        return coach == null ? null : coach.id;
+        return coach == null ? null : coach.getId();
     }
 
     default Long map(Schedule schedule) {
-        return schedule == null ? null : schedule.id;
+        return schedule == null ? null : schedule.getId();
     }
 }

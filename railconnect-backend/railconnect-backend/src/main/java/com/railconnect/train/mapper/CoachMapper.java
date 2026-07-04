@@ -17,5 +17,7 @@ public interface CoachMapper {
     @Mapping(target = "trainId", source = "train.id")
     @Mapping(target = "trainNumber", source = "train.number")
     @Mapping(target = "trainName", source = "train.name")
+    @Mapping(target = "coachCode", source = "coachNumber")
+    @Mapping(target = "totalSeats", source = "seatCount")
     CoachResponse toResponse(Coach coach);
 }

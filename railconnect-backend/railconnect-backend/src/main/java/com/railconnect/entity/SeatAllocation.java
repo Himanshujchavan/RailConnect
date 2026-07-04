@@ -26,6 +26,54 @@ public class SeatAllocation {
         return this.id;
     }
 
+    public Seat getSeat() {
+        return this.seat;
+    }
+
+    public void setSeat(Seat seat) {
+        this.seat = seat;
+    }
+
+    public Schedule getSchedule() {
+        return this.schedule;
+    }
+
+    public void setSchedule(Schedule schedule) {
+        this.schedule = schedule;
+    }
+
+    public LocalDate getJourneyDate() {
+        return this.journeyDate;
+    }
+
+    public void setJourneyDate(LocalDate journeyDate) {
+        this.journeyDate = journeyDate;
+    }
+
+    public Long getBookingPassengerId() {
+        return this.bookingPassengerId;
+    }
+
+    public void setBookingPassengerId(Long bookingPassengerId) {
+        this.bookingPassengerId = bookingPassengerId;
+    }
+
+    public LocalDateTime getAllocatedAt() {
+        return this.allocatedAt;
+    }
+
+    public void setAllocatedAt(LocalDateTime allocatedAt) {
+        this.allocatedAt = allocatedAt;
+    }
+
+    public String getStatus() {
+        return this.status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "seat_id", nullable = false)

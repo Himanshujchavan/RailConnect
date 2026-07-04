@@ -10,4 +10,5 @@ import java.util.List;
 public interface CoachRepository extends JpaRepository<Coach, Long> {
     List<Coach> findByTrainId(Long trainId);
     boolean existsByTrainIdAndCoachNumber(Long trainId, String coachNumber);
+    boolean existsByTrainIdAndCoachNumberAndIdNot(Long trainId, String coachNumber, Long id);
 }

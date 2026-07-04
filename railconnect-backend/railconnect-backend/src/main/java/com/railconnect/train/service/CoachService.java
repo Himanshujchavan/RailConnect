@@ -7,6 +7,7 @@ import java.util.List;
 
 public interface CoachService {
     CoachResponse addCoachToTrain(CoachRequest request);
+    CoachResponse updateCoach(Long coachId, CoachRequest request);
     List<CoachResponse> getCoachesByTrain(Long trainId);
     void removeCoach(Long coachId);
 }

@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -24,11 +23,16 @@ public class CoachServiceImpl implements CoachService {
     private final CoachRepository coachRepository;
     private final TrainRepository trainRepository;
     private final CoachMapper coachMapper;
+    private final SeatGenerationService seatGenerationService;
 
-    public CoachServiceImpl(CoachRepository coachRepository, TrainRepository trainRepository, CoachMapper coachMapper) {
+    public CoachServiceImpl(CoachRepository coachRepository,
+                            TrainRepository trainRepository,
+                            CoachMapper coachMapper,
+                            SeatGenerationService seatGenerationService) {
         this.coachRepository = coachRepository;
         this.trainRepository = trainRepository;
         this.coachMapper = coachMapper;
+        this.seatGenerationService = seatGenerationService;
     }
 
     @Override
@@ -45,39 +49,35 @@ public class CoachServiceImpl implements CoachService {
         Coach coach = coachMapper.toEntity(request);
         coach.setTrain(train);
         coach.setIsActive(true);
+        coach.setSeats(seatGenerationService.generateCoachSeats(coach));
+        Coach savedCoach = coachRepository.save(coach);
+        return coachMapper.toResponse(savedCoach);
+    }
 
-        List<Seat> generatedSeats = new ArrayList<>();
+    @Override
+    @Transactional
+    public CoachResponse updateCoach(Long coachId, CoachRequest request) {
+        Coach coach = coachRepository.findById(coachId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Coach configuration not found"));
 
-        // Indian Railways standard 8-berth layout sequence template (Sleeper/3AC)
-        String[] berthPatterns = {"LOWER", "MIDDLE", "UPPER", "LOWER", "MIDDLE", "UPPER", "SIDE LOWER", "SIDE UPPER"};
-        String[] labelSuffixes = {"LB", "MB", "UB", "LB", "MB", "UB", "SL", "SU"};
+        Train train = trainRepository.findById(request.getTrainId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Train not found"));
 
-        for (int i = 1; i <= request.getSeatCount(); i++) {
-            String berthType;
-            String seatLabel;
-
-            if (request.getCoachType().equalsIgnoreCase("AC 2 Tier")) {
-                int remainder = i % 4;
-                if (remainder == 1) { berthType = "LOWER"; seatLabel = i + " LB"; }
-                else if (remainder == 2) { berthType = "UPPER"; seatLabel = i + " UB"; }
-                else if (remainder == 3) { berthType = "SIDE LOWER"; seatLabel = i + " SL"; }
-                else { berthType = "SIDE UPPER"; seatLabel = i + " SU"; }
-            } else {
-                int index = (i - 1) % 8;
-                berthType = berthPatterns[index];
-                seatLabel = i + " " + labelSuffixes[index];
-            }
-
-            Seat seat = Seat.builder()
-                    .coach(coach)
-                    .seatNumber(i)
-                    .berthType(berthType)
-                    .seatLabel(seatLabel)
-                    .build();
-            generatedSeats.add(seat);
+        if (coachRepository.existsByTrainIdAndCoachNumberAndIdNot(request.getTrainId(), request.getCoachNumber(), coachId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Coach number " + request.getCoachNumber() + " already exists on this train");
         }
 
-        coach.setSeats(generatedSeats);
+        coach.setTrain(train);
+        coach.setCoachNumber(request.getCoachNumber());
+        coach.setCoachType(request.getCoachType());
+        coach.setSeatCount(request.getSeatCount());
+        coach.setPosition(request.getPosition());
+        coach.setIsActive(true);
+
+        coach.getSeats().clear();
+        coach.setSeats(seatGenerationService.generateCoachSeats(coach));
+
         Coach savedCoach = coachRepository.save(coach);
         return coachMapper.toResponse(savedCoach);
     }
