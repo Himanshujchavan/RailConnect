@@ -1,23 +1,38 @@
 package com.railconnect.entity;
 
-import com.railconnect.common.enums.SeatStatus;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.*;
 
 @Entity
-@Table(name = "seats")
+@Table(name = "seats",
+       uniqueConstraints = @UniqueConstraint(columnNames = {"coach_id", "seat_number"}))
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Seat {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    public Long id;
+    private Long id;
 
-    public String seatNumber;
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "coach_id", nullable = false)
+    private Coach coach;
 
-    @Enumerated(EnumType.STRING)
-    public SeatStatus status;
+    @NotNull
+    @Column(name = "seat_number", nullable = false)
+    private Integer seatNumber; // e.g., 1, 2, 3...
 
-    @ManyToOne
-    @JoinColumn(name = "coach_id")
-    public Coach coach;
+    @NotBlank
+    @Column(name = "berth_type", nullable = false)
+    private String berthType; // LOWER, UPPER, MIDDLE, SIDE LOWER, SIDE UPPER
 
-    public Seat() {}
+    @NotBlank
+    @Column(name = "seat_label", nullable = false)
+    private String seatLabel; // e.g., "1 LB", "2 UB", "7 SL"
 }
