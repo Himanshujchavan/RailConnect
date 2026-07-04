@@ -50,8 +50,3 @@ VITE_API_BASE_URL=http://localhost:8080/api
 - `src/context/AppContext.jsx` stores booking state across the flow
 - `src/data/trains.js` provides mock train data that can be swapped for real API calls later
 - `src/components/ui/` contains small reusable UI primitives used across the app
-
-## Notes
-
-- The project currently ships as a frontend-only implementation with mock data in a few screens.
-- Custom UI primitives are hand-rolled rather than pulled from a generator, so they stay easy to extend inside this repo.
