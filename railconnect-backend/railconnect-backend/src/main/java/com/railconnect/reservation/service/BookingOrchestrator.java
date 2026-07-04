@@ -9,6 +9,7 @@ import com.railconnect.entity.BookingPassenger;
 import com.railconnect.entity.Coach;
 import com.railconnect.entity.PNR;
 import com.railconnect.entity.Passenger;
+import com.railconnect.entity.SeatAllocation;
 import com.railconnect.entity.User;
 import com.railconnect.reservation.repository.BookingPassengerRepository;
 import com.railconnect.reservation.repository.BookingRepository;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -27,10 +29,6 @@ import java.util.stream.Collectors;
  * <p>
  * Coordinates the end-to-end reservation flow:
  * validate -> allocate seats -> calculate fare -> persist booking &amp; passengers -> generate PNR.
- * This is the piece the roadmap calls out as "BookingOrchestrator" — it used to be inlined
- * directly inside {@code BookingServiceImpl.createBooking()}. Pulling it out here keeps
- * {@code BookingService}/{@code BookingServiceImpl} a thin facade, and keeps validation,
- * seat allocation, fare calculation and PNR generation each in their own single-purpose class.
  */
 @Component
 public class BookingOrchestrator {
@@ -69,7 +67,7 @@ public class BookingOrchestrator {
         Coach coach = validated.coach();
 
         boolean isFamilyBooking = isFamilyBooking(request.passengers());
-        List<Long> seatIds = isFamilyBooking
+        List<SeatAllocation> allocations = isFamilyBooking
                 ? seatAllocationService.allocateFamilySeats(
                         request.scheduleId(),
                         request.coachId(),
@@ -82,8 +80,14 @@ public class BookingOrchestrator {
                         request.seatPreference(),
                         request.passengers().size());
 
+        List<Long> seatIds = allocations.stream()
+                .map(a -> a.getSeat().getId())
+                .toList();
+
         Booking savedBooking = saveBooking(request, user, coach);
-        List<BookingPassenger> bookingPassengers = savePassengers(request.passengers(), user, savedBooking);
+        
+        // Pass the allocations down to link them with passengers
+        List<BookingPassenger> bookingPassengers = savePassengers(request.passengers(), user, savedBooking, allocations);
         String pnrCode = generateAndAttachPnr(savedBooking);
 
         return new BookingConfirmationResponse(
@@ -113,33 +117,34 @@ public class BookingOrchestrator {
         return bookingRepository.save(booking);
     }
 
-    private List<BookingPassenger> savePassengers(List<PassengerRequest> passengerRequests, User user, Booking savedBooking) {
-        return passengerRequests.stream()
-                .map(passengerRequest -> {
-                    Passenger passenger = new Passenger();
-                    passenger.firstName = passengerRequest.firstName();
-                    passenger.lastName = passengerRequest.lastName();
-                    passenger.gender = passengerRequest.gender();
-                    passenger.user = user;
-                    Passenger savedPassenger = passengerRepository.save(passenger);
+    private List<BookingPassenger> savePassengers(List<PassengerRequest> passengerRequests, User user, Booking savedBooking, List<SeatAllocation> allocations) {
+        List<BookingPassenger> bookingPassengers = new ArrayList<>();
+        
+        for (int i = 0; i < passengerRequests.size(); i++) {
+            PassengerRequest passengerRequest = passengerRequests.get(i);
+            
+            Passenger passenger = new Passenger();
+            passenger.firstName = passengerRequest.firstName();
+            passenger.lastName = passengerRequest.lastName();
+            passenger.gender = passengerRequest.gender();
+            passenger.user = user;
+            Passenger savedPassenger = passengerRepository.save(passenger);
 
-                    BookingPassenger bookingPassenger = new BookingPassenger();
-                    bookingPassenger.booking = savedBooking;
-                    bookingPassenger.passenger = savedPassenger;
-                    return bookingPassengerRepository.save(bookingPassenger);
-                })
-                .collect(Collectors.toList());
+            BookingPassenger bookingPassenger = new BookingPassenger();
+            bookingPassenger.booking = savedBooking;
+            bookingPassenger.passenger = savedPassenger;
+            
+            // LINK DETECTED: Map the exact allocated seat to this specific passenger index
+            if (i < allocations.size()) {
+                bookingPassenger.setSeatAllocation(allocations.get(i));
+            }
+            
+            bookingPassengers.add(bookingPassengerRepository.save(bookingPassenger));
+        }
+        
+        return bookingPassengers;
     }
 
-    /**
-     * Auto-detects whether a booking should be treated as a family/group booking so
-     * {@link #process} can route it through {@link SeatAllocationService#allocateFamilySeats}
-     * instead of the standard preference-based {@link SeatAllocationService#allocateSeats}.
-     * <p>
-     * Rules:
-     * 1. Passenger count is 3 or more, OR
-     * 2. Two or more passengers share the exact same last name (case/whitespace-insensitive).
-     */
     private boolean isFamilyBooking(List<PassengerRequest> passengers) {
         if (passengers == null || passengers.isEmpty()) {
             return false;

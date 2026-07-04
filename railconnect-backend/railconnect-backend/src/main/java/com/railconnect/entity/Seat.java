@@ -29,12 +29,13 @@ public class Seat {
     @NotNull
     @Column(name = "seat_number", nullable = false)
     private Integer seatNumber;
-    
-@NotNull
-@Enumerated(EnumType.STRING)
-@Column(name = "berth_type", nullable = false)
-private BerthType berthType;
 
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "berth_type", nullable = false)
+    private BerthType berthType;
+
+    @NotNull
     @Column(name = "seat_label", nullable = false)
     private String seatLabel;
 }

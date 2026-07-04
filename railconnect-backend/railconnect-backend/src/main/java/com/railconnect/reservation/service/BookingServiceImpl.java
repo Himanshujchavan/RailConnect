@@ -22,8 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class BookingServiceImpl implements BookingService {
@@ -32,7 +32,7 @@ public class BookingServiceImpl implements BookingService {
     private final BookingPassengerRepository bookingPassengerRepository;
     private final PassengerRepository passengerRepository;
     private final UserRepository userRepository;
-        private final CoachRepository coachRepository;
+    private final CoachRepository coachRepository;
     private final TrainRepository trainRepository;
     private final SeatAllocationService seatAllocationService;
     private final FareService fareService;
@@ -73,18 +73,20 @@ public class BookingServiceImpl implements BookingService {
         trainRepository.findById(coach.getTrain().getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Train not found"));
 
-        List<SeatAllocation> allocations =
-        seatAllocationService.allocateSeats(
+        // 1. Fetch seat allocations from the allocation engine
+        List<SeatAllocation> allocations = seatAllocationService.allocateSeats(
                 request.scheduleId(),
-                coach.getTrain().getId(), // trainId
+                coach.getTrain().getId(), 
                 request.journeyDate(),
                 request.seatPreference(),
                 request.passengers().size()
         );
 
-List<Long> seatIds = allocations.stream()
-        .map(a -> a.getSeat().getId())
-        .toList();
+        List<Long> seatIds = allocations.stream()
+                .map(a -> a.getSeat().getId())
+                .toList();
+
+        // 2. Base Booking Header setup
         Booking booking = new Booking();
         booking.createdAt = LocalDateTime.now();
         booking.status = com.railconnect.common.enums.BookingStatus.CONFIRMED;
@@ -96,22 +98,32 @@ List<Long> seatIds = allocations.stream()
 
         Booking savedBooking = bookingRepository.save(booking);
 
-        List<BookingPassenger> bookingPassengers = request.passengers().stream()
-                .map(passengerRequest -> {
-                    Passenger passenger = new Passenger();
-                    passenger.firstName = passengerRequest.firstName();
-                    passenger.lastName = passengerRequest.lastName();
-                    passenger.gender = passengerRequest.gender();
-                    passenger.user = user;
-                    Passenger savedPassenger = passengerRepository.save(passenger);
+        // 3. Save Passengers and associate them with their respective SeatAllocation
+        List<BookingPassenger> bookingPassengers = new ArrayList<>();
+        
+        for (int i = 0; i < request.passengers().size(); i++) {
+            var passengerRequest = request.passengers().get(i);
+            
+            Passenger passenger = new Passenger();
+            passenger.firstName = passengerRequest.firstName();
+            passenger.lastName = passengerRequest.lastName();
+            passenger.gender = passengerRequest.gender();
+            passenger.user = user;
+            Passenger savedPassenger = passengerRepository.save(passenger);
 
-                    BookingPassenger bookingPassenger = new BookingPassenger();
-                    bookingPassenger.booking = savedBooking;
-                    bookingPassenger.passenger = savedPassenger;
-                    return bookingPassengerRepository.save(bookingPassenger);
-                })
-                .collect(Collectors.toList());
+            BookingPassenger bookingPassenger = new BookingPassenger();
+            bookingPassenger.booking = savedBooking;
+            bookingPassenger.passenger = savedPassenger;
+            
+            // LINK DETECTED: Associate the matching seat allocation for this specific passenger position
+            if (i < allocations.size()) {
+                bookingPassenger.setSeatAllocation(allocations.get(i));
+            }
+            
+            bookingPassengers.add(bookingPassengerRepository.save(bookingPassenger));
+        }
 
+        // 4. Handle PNR assignment and completion
         String pnrCode = pnrService.generatePNR();
         PNR pnr = new PNR();
         pnr.code = pnrCode;

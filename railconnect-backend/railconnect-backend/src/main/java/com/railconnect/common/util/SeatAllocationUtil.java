@@ -1,5 +1,7 @@
 package com.railconnect.common.util;
 
+import com.railconnect.common.enums.BerthType;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -15,17 +17,16 @@ public final class SeatAllocationUtil {
      */
     public static List<Long> filterSeatsByPreference(
             List<SeatInfo> availableSeats,
-            String preference,
+            BerthType preference,
             int count) {
 
         List<Long> selectedSeatIds = new ArrayList<>();
 
-        // Phase 1: Match preferred berth
-        if (preference != null && !preference.isBlank()) {
+        if (preference != null) {
 
             for (SeatInfo seat : availableSeats) {
 
-                if (preference.equalsIgnoreCase(seat.getBerthType())) {
+                if (seat.getBerthType() == preference) {
 
                     selectedSeatIds.add(seat.getSeatId());
 
@@ -36,7 +37,7 @@ public final class SeatAllocationUtil {
             }
         }
 
-        // Phase 2: Fill remaining seats
+        // Fill remaining seats
         for (SeatInfo seat : availableSeats) {
 
             if (!selectedSeatIds.contains(seat.getSeatId())) {
@@ -54,12 +55,6 @@ public final class SeatAllocationUtil {
 
     /**
      * Find best seats.
-     *
-     * Strategy
-     *
-     * 1. Same coach
-     * 2. Consecutive seats
-     * 3. First available
      */
     public static List<SeatInfo> computeOptimalAllocations(
             List<SeatInfo> availableSeats,
@@ -78,8 +73,7 @@ public final class SeatAllocationUtil {
 
         for (int i = 0; i <= sortedSeats.size() - partySize; i++) {
 
-            List<SeatInfo> window =
-                    sortedSeats.subList(i, i + partySize);
+            List<SeatInfo> window = sortedSeats.subList(i, i + partySize);
 
             boolean sameCoach = window.stream()
                     .map(SeatInfo::getCoachNumber)
@@ -114,21 +108,17 @@ public final class SeatAllocationUtil {
     public static class SeatInfo {
 
         private final Long seatId;
-
         private final Long coachId;
-
         private final String coachNumber;
-
         private final Integer seatNumber;
-
-        private final String berthType;
+        private final BerthType berthType;
 
         public SeatInfo(
                 Long seatId,
                 Long coachId,
                 String coachNumber,
                 Integer seatNumber,
-                String berthType) {
+                BerthType berthType) {
 
             this.seatId = seatId;
             this.coachId = coachId;
@@ -153,7 +143,7 @@ public final class SeatAllocationUtil {
             return seatNumber;
         }
 
-        public String getBerthType() {
+        public BerthType getBerthType() {
             return berthType;
         }
 
@@ -163,7 +153,7 @@ public final class SeatAllocationUtil {
                     "seatId=" + seatId +
                     ", coachNumber='" + coachNumber + '\'' +
                     ", seatNumber=" + seatNumber +
-                    ", berthType='" + berthType + '\'' +
+                    ", berthType=" + berthType +
                     '}';
         }
     }
