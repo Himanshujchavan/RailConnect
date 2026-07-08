@@ -38,4 +38,13 @@ public class Seat {
     @NotNull
     @Column(name = "seat_label", nullable = false)
     private String seatLabel;
+
+    @Column(name = "is_ladies_seat", nullable = false)
+    private Boolean isLadiesSeat;
+
+    @Column(name = "is_divyang_seat", nullable = false)
+    private Boolean isDivyangSeat;
+
+    @Column(name = "is_senior_seat", nullable = false)
+    private Boolean isSeniorSeat;
 }

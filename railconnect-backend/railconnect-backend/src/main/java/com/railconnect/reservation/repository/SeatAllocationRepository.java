@@ -8,10 +8,13 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 
 @Repository
 public interface SeatAllocationRepository extends JpaRepository<SeatAllocation, Long> {
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         SELECT sa
         FROM SeatAllocation sa

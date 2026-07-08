@@ -2,21 +2,31 @@ package com.railconnect.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import com.railconnect.notification.NotificationType;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 
 @Entity
 @Table(name = "notifications")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Notification {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    public Long id;
+    private Long id;
 
-    public String type;
-    public String message;
-    public LocalDateTime sentAt;
+    private String title;
+    private NotificationType type;
+    private String message;
+    private LocalDateTime sentAt;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
-    public User user;
-
-    public Notification() {}
+    private User user;
 }

@@ -54,6 +54,7 @@ public class BookingReviewRequest {
         private String gender;
 
         private String preferredBerth; // Optional preference (e.g., "LOWER", "UPPER")
+        private String quotaType; // Quota type (GENERAL, LADIES, SENIOR_CITIZEN)
 
         // Getters and Setters
         public String getName() { return name; }
@@ -67,5 +68,7 @@ public class BookingReviewRequest {
 
         public String getPreferredBerth() { return preferredBerth; }
         public void setPreferredBerth(String preferredBerth) { this.preferredBerth = preferredBerth; }
+        public String getQuotaType() { return quotaType; }
+        public void setQuotaType(String quotaType) { this.quotaType = quotaType; }
     }
 }
