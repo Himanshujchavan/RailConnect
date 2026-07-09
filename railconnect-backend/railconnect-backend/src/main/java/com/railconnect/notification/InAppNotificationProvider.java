@@ -23,7 +23,7 @@ public class InAppNotificationProvider implements NotificationProvider {
     public void sendInApp(Long userId, String title, String body) {
         Notification notification = new Notification();
         notification.setUser(User.builder().id(userId).build());
-        notification.setType(title);
+        notification.setTitle(title);
         notification.setMessage(body);
         notification.setSentAt(java.time.LocalDateTime.now());
         notificationRepository.save(notification);

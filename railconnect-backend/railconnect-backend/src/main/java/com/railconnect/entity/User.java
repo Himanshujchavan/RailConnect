@@ -42,9 +42,7 @@ public class User {
     @OneToMany(mappedBy = "user")
     public List<Passenger> passengers;
 
-    public User() {}
-
-    public String fullName() {
+        public String fullName() {
         if (firstName == null && lastName == null) {
             return username;
         }

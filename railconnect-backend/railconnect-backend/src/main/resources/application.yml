@@ -10,6 +10,19 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  # --- WE INTEGRATED THE MAIL BLOCK UNDER THE EXISTING 'SPRING' BLOCK ---
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: your-email@gmail.com
+    password: your-app-password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
 application:
   name: RailConnect
 server:
