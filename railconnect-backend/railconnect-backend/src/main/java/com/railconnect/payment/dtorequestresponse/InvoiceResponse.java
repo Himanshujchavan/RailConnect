@@ -4,14 +4,15 @@ import com.railconnect.common.enums.PaymentStatus;
 
 import java.time.LocalDateTime;
 
-public record PaymentResponse(
+public record InvoiceResponse(
         Long paymentId,
+        Long bookingId,
+        String pnrCode,
+        String transactionRef,
         Double amount,
         Double refundedAmount,
-        LocalDateTime paidAt,
         PaymentStatus status,
-        String transactionRef,
-        String paymentMethod,
-        Long bookingId
+        LocalDateTime paidAt,
+        LocalDateTime invoiceGeneratedAt
 ) {
 }

@@ -13,6 +13,17 @@ public class Payment {
 
     public Double amount;
     public LocalDateTime paidAt;
+    public LocalDateTime createdAt;
+
+    // Reference shown to the user / passed to the (simulated) payment gateway.
+    @Column(unique = true)
+    public String transactionRef;
+
+    // e.g. CARD, UPI, NETBANKING, WALLET
+    public String paymentMethod;
+
+    // Running total of everything refunded so far against this payment.
+    public Double refundedAmount = 0.0;
 
     @Enumerated(EnumType.STRING)
     public PaymentStatus status;
