@@ -1,8 +1,16 @@
 package com.railconnect.train.service;
 
+import com.railconnect.entity.BookingPassenger;
 import com.railconnect.entity.WaitingListAssignment;
+import com.railconnect.notification.NotificationChannel;
+import com.railconnect.notification.NotificationType;
+import com.railconnect.notification.dtorequestresponse.NotificationSendRequest;
+import com.railconnect.notification.service.NotificationService;
+import com.railconnect.reservation.repository.BookingPassengerRepository;
 import com.railconnect.train.repository.WaitingListAssignmentRepository;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,19 +18,28 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
 public class WaitingListServiceImpl implements WaitingListService {
 
+    private static final Logger logger = LoggerFactory.getLogger(WaitingListServiceImpl.class);
+
     private final WaitingListAssignmentRepository wlRepository;
+    private final BookingPassengerRepository bookingPassengerRepository;
+    private final NotificationService notificationService;
 
     // Fixed capacity configuration thresholds for the demo rules
     private static final int MAX_RAC_LIMIT = 5;
     private static final int MAX_WL_LIMIT = 10;
 
-    public WaitingListServiceImpl(WaitingListAssignmentRepository wlRepository) {
+    public WaitingListServiceImpl(WaitingListAssignmentRepository wlRepository,
+                                   BookingPassengerRepository bookingPassengerRepository,
+                                   NotificationService notificationService) {
         this.wlRepository = wlRepository;
+        this.bookingPassengerRepository = bookingPassengerRepository;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -71,6 +88,8 @@ public class WaitingListServiceImpl implements WaitingListService {
             WaitingListAssignment racPassenger = nextRac.get();
             racPassenger.setCurrentStatus("UPGRADED");
             wlRepository.save(racPassenger);
+            notify(racPassenger.getBookingPassengerId(), NotificationType.RAC_UPGRADED,
+                    "Your RAC ticket has been upgraded to a confirmed berth.");
 
             // Step 2: Cascade move the top WL passenger into the now open RAC slot
             Optional<WaitingListAssignment> nextWl = wlRepository
@@ -93,7 +112,34 @@ public class WaitingListServiceImpl implements WaitingListService {
                         .currentStatus("ACTIVE")
                         .build();
                 wlRepository.save(movedToRac);
+                notify(wlPassenger.getBookingPassengerId(), NotificationType.WL_PROMOTED,
+                        "Your waiting list ticket has moved up to RAC.");
             }
+        }
+    }
+
+    /**
+     * Resolves the passenger's account from their {@link BookingPassenger} row and fires the
+     * notification. Never lets a notification failure interrupt the upgrade cascade itself.
+     */
+    private void notify(Long bookingPassengerId, NotificationType type, String details) {
+        try {
+            BookingPassenger bookingPassenger = bookingPassengerRepository.findById(bookingPassengerId)
+                    .orElse(null);
+            if (bookingPassenger == null || bookingPassenger.booking == null || bookingPassenger.booking.user == null) {
+                return;
+            }
+
+            notificationService.send(new NotificationSendRequest(
+                    bookingPassenger.booking.user.id,
+                    type,
+                    List.of(NotificationChannel.EMAIL, NotificationChannel.IN_APP),
+                    details,
+                    null,
+                    null));
+        } catch (Exception ex) {
+            logger.warn("Failed to send {} notification for bookingPassengerId {}: {}",
+                    type, bookingPassengerId, ex.getMessage());
         }
     }
 }

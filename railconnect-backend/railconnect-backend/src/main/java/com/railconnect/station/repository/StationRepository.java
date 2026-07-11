@@ -13,6 +13,8 @@ import java.util.List;
 public interface StationRepository extends JpaRepository<Station, Long> {
     boolean existsByStationCode(String stationCode);
     boolean existsByStationName(String stationName);
+
+    java.util.Optional<Station> findByStationCode(String stationCode);
     
     // Case-insensitive autocomplete search checking against name, code, or city
     @Query("SELECT s FROM Station s WHERE " +

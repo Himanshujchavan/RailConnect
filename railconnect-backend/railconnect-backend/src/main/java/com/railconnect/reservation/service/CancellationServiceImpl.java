@@ -6,14 +6,22 @@ import com.railconnect.entity.Booking;
 import com.railconnect.entity.BookingPassenger;
 import com.railconnect.entity.Coach;
 import com.railconnect.entity.SeatAllocation;
+import com.railconnect.notification.NotificationChannel;
+import com.railconnect.notification.NotificationType;
+import com.railconnect.notification.dtorequestresponse.NotificationSendRequest;
+import com.railconnect.notification.service.NotificationService;
 import com.railconnect.reservation.repository.BookingRepository;
 import com.railconnect.reservation.repository.SeatAllocationRepository;
 import com.railconnect.train.repository.CoachRepository;
 import com.railconnect.train.service.WaitingListService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
 
 /**
  * Phase 3 — Cancellation.
@@ -25,19 +33,24 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class CancellationServiceImpl implements CancellationService {
 
+    private static final Logger logger = LoggerFactory.getLogger(CancellationServiceImpl.class);
+
     private final BookingRepository bookingRepository;
     private final SeatAllocationRepository seatAllocationRepository;
     private final CoachRepository coachRepository;
     private final WaitingListService waitingListService;
+    private final NotificationService notificationService;
 
     public CancellationServiceImpl(BookingRepository bookingRepository,
                                     SeatAllocationRepository seatAllocationRepository,
                                     CoachRepository coachRepository,
-                                    WaitingListService waitingListService) {
+                                    WaitingListService waitingListService,
+                                    NotificationService notificationService) {
         this.bookingRepository = bookingRepository;
         this.seatAllocationRepository = seatAllocationRepository;
         this.coachRepository = coachRepository;
         this.waitingListService = waitingListService;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -55,6 +68,7 @@ public class CancellationServiceImpl implements CancellationService {
         booking.status = BookingStatus.CANCELLED;
         bookingRepository.save(booking);
 
+        notifyCancellation(booking, reason);
         promoteQueue(booking, seatsFreed);
 
         return new CancellationResponse(
@@ -84,6 +98,29 @@ public class CancellationServiceImpl implements CancellationService {
             }
         }
         return freed;
+    }
+
+    /**
+     * Fires a BOOKING_CANCELLED notification to the booking's owner. Never lets a delivery
+     * failure interrupt the cancellation itself.
+     */
+    private void notifyCancellation(Booking booking, String reason) {
+        if (booking.user == null) {
+            return;
+        }
+        String details = (booking.pnrCode != null ? "PNR " + booking.pnrCode : "")
+                + (reason != null && !reason.isBlank() ? " (" + reason + ")" : "");
+        try {
+            notificationService.send(new NotificationSendRequest(
+                    booking.user.id,
+                    NotificationType.BOOKING_CANCELLED,
+                    List.of(NotificationChannel.EMAIL, NotificationChannel.IN_APP),
+                    details.isBlank() ? null : details.trim(),
+                    null,
+                    null));
+        } catch (Exception ex) {
+            logger.warn("Failed to send cancellation notification for booking {}: {}", booking.id, ex.getMessage());
+        }
     }
 
     /**

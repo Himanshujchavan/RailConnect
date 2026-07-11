@@ -21,4 +21,14 @@ public class EmailNotificationProviderImpl implements NotificationProvider {
     public void sendEmail(String to, String subject, String body) {
         log.info("[Mock Email] To: {}, Subject: {}, Body: {}", to, subject, body);
     }
+
+    @Override
+    public void sendSms(String to, String message) {
+        // Not applicable for this mock email provider – no‑op.
+    }
+
+    @Override
+    public void sendPush(Long userId, String title, String body) {
+        // Not applicable for this mock email provider – no‑op.
+    }
 }

@@ -18,4 +18,19 @@ public interface NotificationProvider {
      * @param body email body (plain text)
      */
     void sendEmail(String to, String subject, String body);
+
+    /**
+     * Send an SMS notification.
+     * @param to recipient phone number
+     * @param message SMS body (kept short by convention, but not enforced here)
+     */
+    void sendSms(String to, String message);
+
+    /**
+     * Send a push notification.
+     * @param userId recipient's user id (device/token lookup is an implementation detail)
+     * @param title push notification title
+     * @param body push notification body
+     */
+    void sendPush(Long userId, String title, String body);
 }

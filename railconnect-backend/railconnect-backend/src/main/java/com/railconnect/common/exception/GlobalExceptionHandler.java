@@ -48,6 +48,24 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
+    /**
+     * ResourceNotFoundException carries its own @ResponseStatus, but that annotation is only
+     * honored by Spring's fallback ResponseStatusExceptionResolver - which never runs here
+     * because the catch-all Exception handler below already claims every unmatched exception
+     * type first. Without this explicit handler, every "not found" case would incorrectly
+     * surface as a 500.
+     */
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleResourceNotFound(ResourceNotFoundException exception,
+                                                                  HttpServletRequest request) {
+        ErrorResponse body = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                "ResourceNotFoundException",
+                exception.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException exception,
                                                                      HttpServletRequest request) {

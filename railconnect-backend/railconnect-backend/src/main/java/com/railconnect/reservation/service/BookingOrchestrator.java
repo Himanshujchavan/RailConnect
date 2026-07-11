@@ -12,11 +12,17 @@ import com.railconnect.entity.Passenger;
 import com.railconnect.entity.SeatAllocation;
 import com.railconnect.entity.User;
 import com.railconnect.entity.WaitingListAssignment;
+import com.railconnect.notification.NotificationChannel;
+import com.railconnect.notification.NotificationType;
+import com.railconnect.notification.dtorequestresponse.NotificationSendRequest;
+import com.railconnect.notification.service.NotificationService;
 import com.railconnect.reservation.repository.BookingPassengerRepository;
 import com.railconnect.reservation.repository.BookingRepository;
 import com.railconnect.reservation.repository.PNRRepository;
 import com.railconnect.train.service.WaitingListService;
 import com.railconnect.user.repository.PassengerRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +48,8 @@ import java.util.stream.Collectors;
 @Component
 public class BookingOrchestrator {
 
+    private static final Logger logger = LoggerFactory.getLogger(BookingOrchestrator.class);
+
     private final BookingValidator bookingValidator;
     private final SeatAllocationService seatAllocationService;
     private final FareService fareService;
@@ -51,6 +59,7 @@ public class BookingOrchestrator {
     private final BookingPassengerRepository bookingPassengerRepository;
     private final PassengerRepository passengerRepository;
     private final PNRRepository pnrRepository;
+    private final NotificationService notificationService;
 
     public BookingOrchestrator(BookingValidator bookingValidator,
                                 SeatAllocationService seatAllocationService,
@@ -60,7 +69,8 @@ public class BookingOrchestrator {
                                 BookingRepository bookingRepository,
                                 BookingPassengerRepository bookingPassengerRepository,
                                 PassengerRepository passengerRepository,
-                                PNRRepository pnrRepository) {
+                                PNRRepository pnrRepository,
+                                NotificationService notificationService) {
         this.bookingValidator = bookingValidator;
         this.seatAllocationService = seatAllocationService;
         this.fareService = fareService;
@@ -70,6 +80,7 @@ public class BookingOrchestrator {
         this.bookingPassengerRepository = bookingPassengerRepository;
         this.passengerRepository = passengerRepository;
         this.pnrRepository = pnrRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -89,6 +100,10 @@ public class BookingOrchestrator {
         }
 
         String pnrCode = generateAndAttachPnr(savedBooking);
+
+        if (savedBooking.status == BookingStatus.CONFIRMED) {
+            notifyBookingConfirmed(user, pnrCode);
+        }
 
         List<Long> seatIds = allocations.stream()
                 .map(a -> a.getSeat().getId())
@@ -202,6 +217,24 @@ public class BookingOrchestrator {
 
         savedBooking.status = anyWaitingList ? BookingStatus.WAITING_LIST : BookingStatus.RAC;
         bookingRepository.save(savedBooking);
+    }
+
+    /**
+     * Fires a BOOKING_CONFIRMED notification. Never lets a delivery failure fail the booking
+     * that already succeeded.
+     */
+    private void notifyBookingConfirmed(User user, String pnrCode) {
+        try {
+            notificationService.send(new NotificationSendRequest(
+                    user.id,
+                    NotificationType.BOOKING_CONFIRMED,
+                    List.of(NotificationChannel.EMAIL, NotificationChannel.IN_APP),
+                    "PNR " + pnrCode,
+                    null,
+                    null));
+        } catch (Exception ex) {
+            logger.warn("Failed to send booking-confirmed notification for PNR {}: {}", pnrCode, ex.getMessage());
+        }
     }
 
     private boolean isFamilyBooking(List<PassengerRequest> passengers) {

@@ -16,10 +16,8 @@ public interface NotificationMapper {
      * Maps your custom Notification entity to the NotificationResponse DTO.
      */
     @Mapping(source = "user.id", target = "userId")
-
     @Mapping(source = "sentAt", target = "createdAt")
-    @Mapping(target = "title", ignore = true)
-    @Mapping(target = "read", ignore = true) // Changed from "isRead" to "read" to match JavaBean conventions
+    @Mapping(source = "type", target = "notificationType")
     NotificationResponse toResponse(Notification notification);
 
     /**
