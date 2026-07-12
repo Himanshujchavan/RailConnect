@@ -19,6 +19,13 @@ import java.util.List;
 @Repository("trainSeatRepository")
 public interface SeatRepository extends JpaRepository<Seat, Long> {
 
+	/**
+	 * Total seat inventory per coach type, independent of any date range - used as the
+	 * denominator for Phase 9's coach-utilization report.
+	 */
+	@Query("SELECT s.coach.coachType, COUNT(s) FROM Seat s GROUP BY s.coach.coachType")
+	List<Object[]> countSeatsByCoachType();
+
 	List<Seat> findByCoachId(Long coachId);
 
 	List<Seat> findByCoachTrainId(Long trainId);

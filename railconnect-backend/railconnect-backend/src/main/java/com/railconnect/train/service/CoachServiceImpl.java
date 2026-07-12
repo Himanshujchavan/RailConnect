@@ -98,4 +98,18 @@ public class CoachServiceImpl implements CoachService {
         }
         coachRepository.deleteById(coachId);
     }
+
+    @Override
+    @Transactional
+    public CoachResponse regenerateSeats(Long coachId) {
+        Coach coach = coachRepository.findById(coachId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Coach configuration not found"));
+
+        // orphanRemoval=true on Coach.seats means clearing + re-adding deletes the old rows.
+        coach.getSeats().clear();
+        coach.setSeats(seatGenerationService.generateCoachSeats(coach));
+
+        Coach savedCoach = coachRepository.save(coach);
+        return coachMapper.toResponse(savedCoach);
+    }
 }

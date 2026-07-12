@@ -63,10 +63,40 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     @Override
     @Transactional(readOnly = true)
+    public ScheduleResponse getScheduleById(Long id) {
+        Schedule schedule = scheduleRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Schedule entry not found"));
+        return scheduleMapper.toResponse(schedule);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<ScheduleResponse> getSchedulesByTrainId(Long trainId) {
         return scheduleRepository.findByTrainId(trainId).stream()
                 .map(scheduleMapper::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public ScheduleResponse updateSchedule(Long id, ScheduleRequest request) {
+        Schedule schedule = scheduleRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Schedule entry not found"));
+
+        Train train = trainRepository.findById(request.getTrainId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Train not found"));
+
+        Route route = routeRepository.findById(request.getRouteId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Route not found"));
+
+        schedule.setTrain(train);
+        schedule.setRoute(route);
+        schedule.setDepartureTime(request.getDepartureTime());
+        schedule.setArrivalTime(request.getArrivalTime());
+        schedule.setOperatingDays(request.getOperatingDays());
+
+        Schedule savedSchedule = scheduleRepository.save(schedule);
+        return scheduleMapper.toResponse(savedSchedule);
     }
 
     @Override

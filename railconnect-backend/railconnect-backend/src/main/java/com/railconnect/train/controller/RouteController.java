@@ -30,6 +30,11 @@ public class RouteController {
         return new ResponseEntity<>(createdRoute, HttpStatus.CREATED);
     }
 
+    @PutMapping("/admin/routes/{id}")
+    public ResponseEntity<RouteResponse> updateRoute(@PathVariable Long id, @Valid @RequestBody RouteRequest request) {
+        return ResponseEntity.ok(routeService.updateRoute(id, request));
+    }
+
     @DeleteMapping("/admin/routes/{id}")
     public ResponseEntity<Void> deleteRoute(@PathVariable Long id) {
         routeService.deleteRoute(id);

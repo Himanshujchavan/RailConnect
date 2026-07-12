@@ -43,4 +43,9 @@ public class CoachController {
         coachService.removeCoach(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/admin/coaches/{id}/regenerate-seats")
+    public ResponseEntity<CoachResponse> regenerateSeats(@PathVariable Long id) {
+        return ResponseEntity.ok(coachService.regenerateSeats(id));
+    }
 }

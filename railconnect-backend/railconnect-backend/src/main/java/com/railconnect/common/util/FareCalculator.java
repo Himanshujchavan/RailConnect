@@ -12,20 +12,22 @@ public final class FareCalculator {
      * Calculates ticket fare dynamically based on distance, coach type, and age logic.
      */
     public static double calculateFare(double distanceInKm, CoachType coachType, int passengerAge) {
+        return calculateFare(distanceInKm, coachType, passengerAge, null);
+    }
+
+    /**
+     * Same as {@link #calculateFare(double, CoachType, int)}, but lets a caller (Phase 8's
+     * Fare Management) supply an admin-configured rate per km for this coach type. Pass
+     * {@code null} to fall back to the built-in default rate below.
+     */
+    public static double calculateFare(double distanceInKm, CoachType coachType, int passengerAge,
+                                        Double ratePerKmOverride) {
         if (distanceInKm <= 0) {
             return 0.0;
         }
 
         // Base rate calculation per kilometer covering every single CoachType enum constant
-        double ratePerKm = switch (coachType) {
-            case FIRST_AC -> 3.50;
-            case SECOND_AC -> 2.20;
-            case THIRD_AC -> 1.70;
-            case AC_CHAIR_CAR -> 1.20;
-            case SLEEPER -> 0.60;
-            case SECOND_SITTING -> 0.40;
-            case GENERAL -> 0.25;
-        };
+        double ratePerKm = ratePerKmOverride != null ? ratePerKmOverride : defaultRatePerKm(coachType);
 
         double baseFare = distanceInKm * ratePerKm;
 
@@ -37,5 +39,21 @@ public final class FareCalculator {
         }
 
         return Math.round(baseFare * 100.0) / 100.0; // Standard currency rounding
+    }
+
+    /**
+     * The built-in rate per km for a coach type, used whenever no admin {@code FareRule}
+     * override exists for it.
+     */
+    public static double defaultRatePerKm(CoachType coachType) {
+        return switch (coachType) {
+            case FIRST_AC -> 3.50;
+            case SECOND_AC -> 2.20;
+            case THIRD_AC -> 1.70;
+            case AC_CHAIR_CAR -> 1.20;
+            case SLEEPER -> 0.60;
+            case SECOND_SITTING -> 0.40;
+            case GENERAL -> 0.25;
+        };
     }
 }

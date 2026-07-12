@@ -23,6 +23,12 @@ public interface RouteRepository extends JpaRepository<Route, Long> {
     boolean existsByRouteName(String routeName);
 
     /**
+     * Same uniqueness check as {@link #existsByRouteName}, but excludes the route being
+     * updated so renaming a route to its own current name doesn't false-positive as a conflict.
+     */
+    boolean existsByRouteNameAndIdNot(String routeName, Long id);
+
+    /**
      * Finds all routes that originate from a specific station.
      */
     List<Route> findBySourceStationId(Long sourceStationId);

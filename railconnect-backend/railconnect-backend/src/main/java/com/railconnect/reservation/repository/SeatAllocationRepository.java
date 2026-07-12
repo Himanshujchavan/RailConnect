@@ -26,4 +26,20 @@ public interface SeatAllocationRepository extends JpaRepository<SeatAllocation, 
             @Param("scheduleId") Long scheduleId,
             @Param("journeyDate") LocalDate journeyDate
     );
+
+    // --- Phase 9 — Reporting ---
+
+    long countByJourneyDateBetweenAndStatus(LocalDate from, LocalDate to, String status);
+
+    @Query("""
+        SELECT s.coach.coachType, COUNT(sa)
+        FROM SeatAllocation sa
+        JOIN sa.seat s
+        WHERE sa.journeyDate BETWEEN :from AND :to
+        AND sa.status = :status
+        GROUP BY s.coach.coachType
+    """)
+    List<Object[]> countBookedByCoachType(@Param("from") LocalDate from,
+                                          @Param("to") LocalDate to,
+                                          @Param("status") String status);
 }

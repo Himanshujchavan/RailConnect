@@ -1,5 +1,6 @@
 package com.railconnect.search.service;
 
+import com.railconnect.admin.service.FareManagementService;
 import com.railconnect.common.enums.CoachType;
 import com.railconnect.common.exception.InvalidStationException;
 import com.railconnect.common.exception.ResourceNotFoundException;
@@ -40,6 +41,7 @@ public class SearchServiceImpl implements SearchService {
     private final SeatRepository seatRepository;
     private final TrainMapper trainMapper;
     private final RouteMapper routeMapper;
+    private final FareManagementService fareManagementService;
 
     public SearchServiceImpl(StationRepository stationRepository,
                               StationService stationService,
@@ -48,7 +50,8 @@ public class SearchServiceImpl implements SearchService {
                               CoachRepository coachRepository,
                               SeatRepository seatRepository,
                               TrainMapper trainMapper,
-                              RouteMapper routeMapper) {
+                              RouteMapper routeMapper,
+                              FareManagementService fareManagementService) {
         this.stationRepository = stationRepository;
         this.stationService = stationService;
         this.routeRepository = routeRepository;
@@ -57,6 +60,7 @@ public class SearchServiceImpl implements SearchService {
         this.seatRepository = seatRepository;
         this.trainMapper = trainMapper;
         this.routeMapper = routeMapper;
+        this.fareManagementService = fareManagementService;
     }
 
     @Override
@@ -124,7 +128,8 @@ public class SearchServiceImpl implements SearchService {
         RouteStation destinationStop = findRouteStation(route, destinationStationCode);
 
         double distanceKm = Math.abs(destinationStop.getDistanceFromSource() - sourceStop.getDistanceFromSource());
-        double fare = FareCalculator.calculateFare(distanceKm, coachType, passengerAge);
+        Double rateOverride = fareManagementService.getEffectiveRatePerKm(coachType);
+        double fare = FareCalculator.calculateFare(distanceKm, coachType, passengerAge, rateOverride);
 
         return new FareSearchResponse(scheduleId, sourceStationCode.toUpperCase(), destinationStationCode.toUpperCase(),
                 distanceKm, coachType, passengerAge, fare);

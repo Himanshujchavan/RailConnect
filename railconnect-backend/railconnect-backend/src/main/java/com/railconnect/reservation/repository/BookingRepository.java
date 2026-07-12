@@ -19,4 +19,21 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
      */
     List<Booking> findByScheduleIdInAndJourneyDateGreaterThanEqualAndStatusIn(
             List<Long> scheduleIds, LocalDate journeyDate, List<BookingStatus> statuses);
+
+    // --- Phase 7 — User Dashboard ---
+
+    List<Booking> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    List<Booking> findByUserIdAndJourneyDateGreaterThanEqualAndStatusInOrderByJourneyDateAsc(
+            Long userId, LocalDate journeyDate, List<BookingStatus> statuses);
+
+    List<Booking> findByUserIdAndStatusOrderByJourneyDateDesc(Long userId, BookingStatus status);
+
+    // --- Phase 9 — Reporting ---
+
+    List<Booking> findByJourneyDateBetween(LocalDate from, LocalDate to);
+
+    long countByJourneyDateBetween(LocalDate from, LocalDate to);
+
+    long countByJourneyDateBetweenAndStatus(LocalDate from, LocalDate to, BookingStatus status);
 }

@@ -93,6 +93,54 @@ public class RouteServiceImpl implements RouteService {
 
     @Override
     @Transactional
+    public RouteResponse updateRoute(Long id, RouteRequest request) {
+        Route route = routeRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Route profile not found"));
+
+        if (routeRepository.existsByRouteNameAndIdNot(request.getRouteName(), id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Route name already exists");
+        }
+
+        Station source = stationRepository.findById(request.getSourceStationId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Source station not found"));
+
+        Station destination = stationRepository.findById(request.getDestinationStationId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Destination station not found"));
+
+        route.setRouteName(request.getRouteName());
+        route.setSourceStation(source);
+        route.setDestinationStation(destination);
+
+        List<RouteStation> detailedStops = new ArrayList<>();
+        int lastDistance = -1;
+
+        for (RouteStationRequest stopReq : request.getRouteStations()) {
+            Station stopStation = stationRepository.findById(stopReq.getStationId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Station inside route sequence not found"));
+
+            if (stopReq.getDistanceFromSource() <= lastDistance) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Distances must increase progressively along the route tracking path");
+            }
+            lastDistance = stopReq.getDistanceFromSource();
+
+            RouteStation routeStation = new RouteStation();
+            routeStation.setRoute(route);
+            routeStation.setStation(stopStation);
+            routeStation.setStopOrder(stopReq.getStopOrder());
+            routeStation.setDistanceFromSource(stopReq.getDistanceFromSource());
+            detailedStops.add(routeStation);
+        }
+
+        // orphanRemoval=true on Route.routeStations means clearing + re-adding deletes the old rows.
+        route.getRouteStations().clear();
+        route.getRouteStations().addAll(detailedStops);
+
+        Route savedRoute = routeRepository.save(route);
+        return routeMapper.toResponse(savedRoute);
+    }
+
+    @Override
+    @Transactional
     public void deleteRoute(Long id) {
         if (!routeRepository.existsById(id)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Route not found");
