@@ -19,7 +19,6 @@ public interface BookingMapper {
 
     @Mapping(target = "user", source = "userId")
     @Mapping(target = "bookingPassengers", source = "passengers")
-
     Booking toEntity(CreateBookingRequest request);
 
     @Mapping(target = "booking", ignore = true)
@@ -35,10 +34,10 @@ public interface BookingMapper {
     BookingResponse toResponse(Booking booking);
 
     @Mapping(target = "bookingId", source = "booking.id")
+    @Mapping(target = "createdAt", source = "booking.createdAt")
     @Mapping(target = "pnrId", source = "pnr.id")
     @Mapping(target = "paymentId", source = "payment.id")
     @Mapping(target = "status", source = "booking.status")
-    @Mapping(target = "createdAt", source = "booking.createdAt") 
     @Mapping(target = "passengerCount", expression = "java(booking.bookingPassengers == null ? 0 : booking.bookingPassengers.size())")
     BookingHistoryResponse toHistoryResponse(Booking booking, PNR pnr, Payment payment);
 

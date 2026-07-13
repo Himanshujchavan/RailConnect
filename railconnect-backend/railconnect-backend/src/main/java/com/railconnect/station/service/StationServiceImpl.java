@@ -1,10 +1,13 @@
 package com.railconnect.station.service;
 
+import com.railconnect.common.cache.CacheConfig;
 import com.railconnect.station.dtorequestresponse.StationRequest;
 import com.railconnect.station.dtorequestresponse.StationResponse;
 import com.railconnect.station.entity.Station;
 import com.railconnect.station.mapper.StationMapper;
 import com.railconnect.station.repository.StationRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -24,6 +27,7 @@ public class StationServiceImpl implements StationService {
     }
 
     @Override
+    @CacheEvict(value = CacheConfig.STATIONS_CACHE, allEntries = true)
     public StationResponse createStation(StationRequest request) {
         if (repository.existsByStationCode(request.getStationCode())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Station code already exists");
@@ -37,6 +41,7 @@ public class StationServiceImpl implements StationService {
     }
 
     @Override
+    @Cacheable(value = CacheConfig.STATIONS_CACHE, key = "'all'")
     public List<StationResponse> getAllStations() {
         return repository.findAll().stream()
                 .map(mapper::toResponse)
@@ -44,6 +49,7 @@ public class StationServiceImpl implements StationService {
     }
 
     @Override
+    @Cacheable(value = CacheConfig.STATIONS_CACHE, key = "'byId:' + #id")
     public StationResponse getStationById(Long id) {
         Station station = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Station not found"));
@@ -58,6 +64,7 @@ public class StationServiceImpl implements StationService {
     }
 
     @Override
+    @CacheEvict(value = CacheConfig.STATIONS_CACHE, allEntries = true)
     public StationResponse updateStation(Long id, StationRequest request) {
         Station existingStation = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Station not found"));
@@ -77,6 +84,7 @@ public class StationServiceImpl implements StationService {
     }
 
     @Override
+    @CacheEvict(value = CacheConfig.STATIONS_CACHE, allEntries = true)
     public void deleteStation(Long id) {
         Station existingStation = repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Station not found"));

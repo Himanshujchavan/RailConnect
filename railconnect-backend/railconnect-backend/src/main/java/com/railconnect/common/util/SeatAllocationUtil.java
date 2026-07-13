@@ -54,6 +54,54 @@ public final class SeatAllocationUtil {
     }
 
     /**
+     * Find best seats, preferring a consecutive block that contains at least one LOWER berth
+     * when {@code preferLowerBerth} is set (used when a senior-citizen passenger is in the
+     * party, per Smart Seat Allocation's lower-berth-priority rule). Falls back to the plain
+     * consecutive-block search if no such window exists.
+     */
+    public static List<SeatInfo> computeOptimalAllocations(
+            List<SeatInfo> availableSeats,
+            int partySize,
+            boolean preferLowerBerth) {
+
+        if (!preferLowerBerth) {
+            return computeOptimalAllocations(availableSeats, partySize);
+        }
+
+        if (availableSeats == null || availableSeats.isEmpty()) {
+            return List.of();
+        }
+
+        List<SeatInfo> sortedSeats = availableSeats.stream()
+                .sorted(
+                        Comparator.comparing(SeatInfo::getCoachNumber)
+                                .thenComparing(SeatInfo::getSeatNumber)
+                )
+                .toList();
+
+        for (int i = 0; i <= sortedSeats.size() - partySize; i++) {
+            List<SeatInfo> window = sortedSeats.subList(i, i + partySize);
+
+            boolean sameCoach = window.stream().map(SeatInfo::getCoachNumber).distinct().count() == 1;
+            boolean consecutive = true;
+            for (int j = 1; j < window.size(); j++) {
+                if (window.get(j).getSeatNumber() != window.get(j - 1).getSeatNumber() + 1) {
+                    consecutive = false;
+                    break;
+                }
+            }
+            boolean hasLowerBerth = window.stream().anyMatch(seat -> seat.getBerthType() == BerthType.LOWER);
+
+            if (sameCoach && consecutive && hasLowerBerth) {
+                return new ArrayList<>(window);
+            }
+        }
+
+        // No consecutive block happens to include a LOWER berth - fall back to the plain rule.
+        return computeOptimalAllocations(availableSeats, partySize);
+    }
+
+    /**
      * Find best seats.
      */
     public static List<SeatInfo> computeOptimalAllocations(

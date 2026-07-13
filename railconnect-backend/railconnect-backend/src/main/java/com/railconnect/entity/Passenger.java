@@ -12,6 +12,7 @@ public class Passenger {
 
     public String firstName;
     public String lastName;
+    public Integer age;
 
     @Enumerated(EnumType.STRING)
     public Gender gender;

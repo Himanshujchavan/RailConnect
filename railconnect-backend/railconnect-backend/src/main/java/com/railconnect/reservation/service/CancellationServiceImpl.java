@@ -10,12 +10,14 @@ import com.railconnect.notification.NotificationChannel;
 import com.railconnect.notification.NotificationType;
 import com.railconnect.notification.dtorequestresponse.NotificationSendRequest;
 import com.railconnect.notification.service.NotificationService;
+import com.railconnect.realtime.event.SeatAvailabilityChangedEvent;
 import com.railconnect.reservation.repository.BookingRepository;
 import com.railconnect.reservation.repository.SeatAllocationRepository;
 import com.railconnect.train.repository.CoachRepository;
 import com.railconnect.train.service.WaitingListService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,17 +42,20 @@ public class CancellationServiceImpl implements CancellationService {
     private final CoachRepository coachRepository;
     private final WaitingListService waitingListService;
     private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public CancellationServiceImpl(BookingRepository bookingRepository,
                                     SeatAllocationRepository seatAllocationRepository,
                                     CoachRepository coachRepository,
                                     WaitingListService waitingListService,
-                                    NotificationService notificationService) {
+                                    NotificationService notificationService,
+                                    ApplicationEventPublisher eventPublisher) {
         this.bookingRepository = bookingRepository;
         this.seatAllocationRepository = seatAllocationRepository;
         this.coachRepository = coachRepository;
         this.waitingListService = waitingListService;
         this.notificationService = notificationService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -67,6 +72,10 @@ public class CancellationServiceImpl implements CancellationService {
 
         booking.status = BookingStatus.CANCELLED;
         bookingRepository.save(booking);
+
+        if (seatsFreed > 0) {
+            eventPublisher.publishEvent(new SeatAvailabilityChangedEvent(booking.scheduleId, booking.journeyDate));
+        }
 
         notifyCancellation(booking, reason);
         promoteQueue(booking, seatsFreed);

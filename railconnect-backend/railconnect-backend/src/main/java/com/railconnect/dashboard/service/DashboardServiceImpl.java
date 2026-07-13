@@ -100,6 +100,7 @@ public class DashboardServiceImpl implements DashboardService {
         passenger.firstName = request.firstName();
         passenger.lastName = request.lastName();
         passenger.gender = request.gender();
+        passenger.age = request.age();
         passenger.user = user;
 
         return passengerMapper.toResponse(passengerRepository.save(passenger));
@@ -112,6 +113,7 @@ public class DashboardServiceImpl implements DashboardService {
         passenger.firstName = request.firstName();
         passenger.lastName = request.lastName();
         passenger.gender = request.gender();
+        passenger.age = request.age();
         return passengerMapper.toResponse(passengerRepository.save(passenger));
     }
 

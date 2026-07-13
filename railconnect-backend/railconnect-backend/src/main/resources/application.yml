@@ -1,21 +1,25 @@
 spring:
+  application:
+    name: RailConnect
+
   datasource:
-    url: jdbc:postgresql://localhost:5432/railconnect
-    username: postgres
-    password: 12345678
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:railconnect}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:12345678}
+
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    show-sql: ${JPA_SHOW_SQL:true}
     properties:
       hibernate:
         format_sql: true
-  # --- WE INTEGRATED THE MAIL BLOCK UNDER THE EXISTING 'SPRING' BLOCK ---
+
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: your-email@gmail.com
-    password: your-app-password
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:your-email@gmail.com}
+    password: ${MAIL_PASSWORD:your-app-password}
     properties:
       mail:
         smtp:
@@ -23,16 +27,84 @@ spring:
           starttls:
             enable: true
 
+  # --- Phase 10: Caching / Redis ---
+  # Cached data (station lists, fare/pricing rules) lives here so repeated reads skip the DB.
+  # Falls back to a no-op cache automatically only if you switch `cache.type` to `none`; with
+  # `type: redis`, a Redis instance is required for the app to start (see docker-compose.yml).
+  cache:
+    type: ${CACHE_TYPE:redis}
+    redis:
+      time-to-live: 600000 # 10 minutes, default TTL for caches that don't set their own
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+
 application:
   name: RailConnect
-server:
-  port: 8080
-logging:
-  level:
-    org.hibernate.SQL: DEBUG
 
-# --- ADD THIS MODULE ROUTE SECTION ---
+server:
+  port: ${SERVER_PORT:8080}
+
+# --- Phase 10: API Versioning ---
+# Every controller is mounted under /api/v1 (see common.constants.APIConstants.API_V1_PREFIX).
+# A breaking change gets its own /api/v2 controller package living alongside v1, rather than
+# modifying v1 in place - old clients keep working against /api/v1 unmodified. The current
+# version is also echoed back on every response via the X-API-Version header (see
+# common.web.ApiVersionHeaderFilter).
+api:
+  version: v1
+
+# --- Phase 10: Rate Limiting ---
+# Simple fixed-window limiter (see common.web.RateLimitingFilter). Keyed per client IP by
+# default; swap to per-API-key if you put this behind an API gateway that forwards one.
+rate-limit:
+  enabled: ${RATE_LIMIT_ENABLED:true}
+  requests-per-window: ${RATE_LIMIT_REQUESTS:100}
+  window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
+
 railconnect:
   jwt:
-    # A safe, 256-bit hexadecimal key for local development
-    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    # A safe, 256-bit hexadecimal key for local development - override via env var in any
+    # real deployment.
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+
+# --- Phase 10: Monitoring & Health Check ---
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: ${ACTUATOR_HEALTH_DETAILS:when-authorized}
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# --- Phase 10: Logging ---
+# Console pattern includes a per-request correlation id (see common.web.RequestLoggingFilter,
+# MDC key "requestId") so every log line for one HTTP request can be grepped together. Full
+# appender/rotation config lives in logback-spring.xml.
+logging:
+  level:
+    root: INFO
+    com.railconnect: ${APP_LOG_LEVEL:INFO}
+    org.hibernate.SQL: ${SQL_LOG_LEVEL:DEBUG}
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [reqId=%X{requestId}] %logger{36} - %msg%n"

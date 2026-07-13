@@ -27,6 +27,15 @@ public interface SeatAllocationRepository extends JpaRepository<SeatAllocation, 
             @Param("journeyDate") LocalDate journeyDate
     );
 
+    // --- Dynamic Pricing ---
+
+    /**
+     * How many seats are currently booked in this specific coach, on this schedule/date.
+     * Used by {@code DynamicPricingService} to compute occupancy-based surcharge/discount.
+     */
+    long countBySeat_Coach_IdAndSchedule_IdAndJourneyDateAndStatus(
+            Long coachId, Long scheduleId, LocalDate journeyDate, String status);
+
     // --- Phase 9 — Reporting ---
 
     long countByJourneyDateBetweenAndStatus(LocalDate from, LocalDate to, String status);

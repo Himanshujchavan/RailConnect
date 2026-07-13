@@ -2,6 +2,9 @@ package com.railconnect.report.controller;
 
 import com.railconnect.report.dtorequestresponse.CancellationReportResponse;
 import com.railconnect.report.dtorequestresponse.CoachUtilizationReportResponse;
+import com.railconnect.report.dtorequestresponse.HighestRevenueRoutesReportResponse;
+import com.railconnect.report.dtorequestresponse.MostBookedTrainsReportResponse;
+import com.railconnect.report.dtorequestresponse.OccupancyHeatmapResponse;
 import com.railconnect.report.dtorequestresponse.OccupancyReportResponse;
 import com.railconnect.report.dtorequestresponse.PassengerReportResponse;
 import com.railconnect.report.dtorequestresponse.PopularRoutesReportResponse;
@@ -80,6 +83,33 @@ public class ReportController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         LocalDate[] range = resolveRange(from, to);
         return ResponseEntity.ok(reportService.getCoachUtilization(range[0], range[1]));
+    }
+
+    @GetMapping("/most-booked-trains")
+    public ResponseEntity<MostBookedTrainsReportResponse> getMostBookedTrains(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "5") int limit) {
+        LocalDate[] range = resolveRange(from, to);
+        return ResponseEntity.ok(reportService.getMostBookedTrains(range[0], range[1], limit));
+    }
+
+    @GetMapping("/highest-revenue-routes")
+    public ResponseEntity<HighestRevenueRoutesReportResponse> getHighestRevenueRoutes(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "5") int limit) {
+        LocalDate[] range = resolveRange(from, to);
+        return ResponseEntity.ok(reportService.getHighestRevenueRoutes(range[0], range[1], limit));
+    }
+
+    @GetMapping("/occupancy-heatmap")
+    public ResponseEntity<OccupancyHeatmapResponse> getOccupancyHeatmap(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "5") int trainLimit) {
+        LocalDate[] range = resolveRange(from, to);
+        return ResponseEntity.ok(reportService.getOccupancyHeatmap(range[0], range[1], trainLimit));
     }
 
     private LocalDate[] resolveRange(LocalDate from, LocalDate to) {

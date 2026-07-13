@@ -1,0 +1,96 @@
+# Phase 10 — CI/CD.
+#
+# Build & test on every push/PR to main. The docker-publish job only runs on pushes to main
+# (not PRs) and needs no manual secrets - it authenticates to GitHub Container Registry (ghcr.io)
+# using the automatically-provided GITHUB_TOKEN. See the "Manual setup" note in the project
+# README for the one repo setting this depends on.
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: railconnect
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: 12345678
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build and run tests
+        run: ./mvnw -B clean verify
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: railconnect
+          DB_USERNAME: postgres
+          DB_PASSWORD: 12345678
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: railconnect-jar
+          path: target/*.jar
+
+  docker-publish:
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}

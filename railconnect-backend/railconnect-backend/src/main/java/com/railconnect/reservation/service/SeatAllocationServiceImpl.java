@@ -6,9 +6,11 @@ import com.railconnect.entity.Coach;
 import com.railconnect.entity.Schedule;
 import com.railconnect.entity.Seat;
 import com.railconnect.entity.SeatAllocation;
+import com.railconnect.realtime.event.SeatAvailabilityChangedEvent;
 import com.railconnect.reservation.repository.SeatAllocationRepository;
 import com.railconnect.train.repository.CoachRepository;
 import com.railconnect.train.repository.ScheduleRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,13 +37,16 @@ public class SeatAllocationServiceImpl implements SeatAllocationService {
     private final CoachRepository coachRepository;
     private final ScheduleRepository scheduleRepository;
     private final SeatAllocationRepository seatAllocationRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public SeatAllocationServiceImpl(CoachRepository coachRepository,
                                      ScheduleRepository scheduleRepository,
-                                     SeatAllocationRepository seatAllocationRepository) {
+                                     SeatAllocationRepository seatAllocationRepository,
+                                     ApplicationEventPublisher eventPublisher) {
         this.coachRepository = coachRepository;
         this.scheduleRepository = scheduleRepository;
         this.seatAllocationRepository = seatAllocationRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -64,12 +69,15 @@ public class SeatAllocationServiceImpl implements SeatAllocationService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Unable to allocate requested seats");
         }
 
-        return persistAllocations(selectedSeatIds, coach, schedule, journeyDate);
+        List<SeatAllocation> saved = persistAllocations(selectedSeatIds, coach, schedule, journeyDate);
+        publishAvailabilityChanged(scheduleId, journeyDate);
+        return saved;
     }
 
     @Override
     @Transactional
-    public List<SeatAllocation> allocateFamilySeats(Long scheduleId, Long coachId, LocalDate journeyDate, int partySize) {
+    public List<SeatAllocation> allocateFamilySeats(Long scheduleId, Long coachId, LocalDate journeyDate,
+                                                     int partySize, boolean preferLowerBerth) {
         Coach coach = resolveCoach(coachId);
         Schedule schedule = resolveSchedule(scheduleId);
         List<SeatAllocationUtil.SeatInfo> availableSeats = getAvailableSeatInfos(coach, scheduleId, journeyDate);
@@ -79,12 +87,15 @@ public class SeatAllocationServiceImpl implements SeatAllocationService {
                     "Not enough seats available in coach " + coach.getCoachNumber() + " for the group");
         }
 
-        List<SeatAllocationUtil.SeatInfo> selectedSeats = SeatAllocationUtil.computeOptimalAllocations(availableSeats, partySize);
+        List<SeatAllocationUtil.SeatInfo> selectedSeats =
+                SeatAllocationUtil.computeOptimalAllocations(availableSeats, partySize, preferLowerBerth);
         List<Long> selectedSeatIds = selectedSeats.stream()
                 .map(SeatAllocationUtil.SeatInfo::getSeatId)
                 .toList();
 
-        return persistAllocations(selectedSeatIds, coach, schedule, journeyDate);
+        List<SeatAllocation> saved = persistAllocations(selectedSeatIds, coach, schedule, journeyDate);
+        publishAvailabilityChanged(scheduleId, journeyDate);
+        return saved;
     }
 
     private Coach resolveCoach(Long coachId) {
@@ -136,6 +147,14 @@ public class SeatAllocationServiceImpl implements SeatAllocationService {
         }
 
         return seatAllocationRepository.saveAll(allocations);
+    }
+
+    /**
+     * Real-Time Features: a booking (this) is exactly the kind of change "Live Seat
+     * Availability" and "Real-time Booking Updates" need to know about.
+     */
+    private void publishAvailabilityChanged(Long scheduleId, LocalDate journeyDate) {
+        eventPublisher.publishEvent(new SeatAvailabilityChangedEvent(scheduleId, journeyDate));
     }
 
     private BerthType parseBerthType(String berthPreference) {

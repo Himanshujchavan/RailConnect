@@ -16,6 +16,7 @@ import com.railconnect.notification.NotificationChannel;
 import com.railconnect.notification.NotificationType;
 import com.railconnect.notification.dtorequestresponse.NotificationSendRequest;
 import com.railconnect.notification.service.NotificationService;
+import com.railconnect.pricing.service.DynamicPricingService;
 import com.railconnect.reservation.repository.BookingPassengerRepository;
 import com.railconnect.reservation.repository.BookingRepository;
 import com.railconnect.reservation.repository.PNRRepository;
@@ -52,7 +53,6 @@ public class BookingOrchestrator {
 
     private final BookingValidator bookingValidator;
     private final SeatAllocationService seatAllocationService;
-    private final FareService fareService;
     private final PNRService pnrService;
     private final WaitingListService waitingListService;
     private final BookingRepository bookingRepository;
@@ -60,20 +60,20 @@ public class BookingOrchestrator {
     private final PassengerRepository passengerRepository;
     private final PNRRepository pnrRepository;
     private final NotificationService notificationService;
+    private final DynamicPricingService dynamicPricingService;
 
     public BookingOrchestrator(BookingValidator bookingValidator,
                                 SeatAllocationService seatAllocationService,
-                                FareService fareService,
                                 PNRService pnrService,
                                 WaitingListService waitingListService,
                                 BookingRepository bookingRepository,
                                 BookingPassengerRepository bookingPassengerRepository,
                                 PassengerRepository passengerRepository,
                                 PNRRepository pnrRepository,
-                                NotificationService notificationService) {
+                                NotificationService notificationService,
+                                DynamicPricingService dynamicPricingService) {
         this.bookingValidator = bookingValidator;
         this.seatAllocationService = seatAllocationService;
-        this.fareService = fareService;
         this.pnrService = pnrService;
         this.waitingListService = waitingListService;
         this.bookingRepository = bookingRepository;
@@ -81,6 +81,7 @@ public class BookingOrchestrator {
         this.passengerRepository = passengerRepository;
         this.pnrRepository = pnrRepository;
         this.notificationService = notificationService;
+        this.dynamicPricingService = dynamicPricingService;
     }
 
     @Transactional
@@ -132,19 +133,33 @@ public class BookingOrchestrator {
      */
     private List<SeatAllocation> tryAllocateSeats(CreateBookingRequest request) {
         boolean isFamilyBooking = isFamilyBooking(request.passengers());
+        boolean hasSeniorCitizen = request.passengers().stream()
+                .anyMatch(p -> p.age() != null && p.age() >= 60);
+
         try {
-            return isFamilyBooking
-                    ? seatAllocationService.allocateFamilySeats(
-                            request.scheduleId(),
-                            request.coachId(),
-                            request.journeyDate(),
-                            request.passengers().size())
-                    : seatAllocationService.allocateSeats(
-                            request.scheduleId(),
-                            request.coachId(),
-                            request.journeyDate(),
-                            request.seatPreference(),
-                            request.passengers().size());
+            if (isFamilyBooking) {
+                return seatAllocationService.allocateFamilySeats(
+                        request.scheduleId(),
+                        request.coachId(),
+                        request.journeyDate(),
+                        request.passengers().size(),
+                        hasSeniorCitizen);
+            }
+
+            // Smart Seat Allocation: lower-berth priority - an explicit preference from the
+            // passenger always wins, but a senior citizen with no stated preference gets
+            // defaulted to LOWER rather than left to chance.
+            String effectivePreference = request.seatPreference();
+            if ((effectivePreference == null || effectivePreference.isBlank()) && hasSeniorCitizen) {
+                effectivePreference = "LOWER";
+            }
+
+            return seatAllocationService.allocateSeats(
+                    request.scheduleId(),
+                    request.coachId(),
+                    request.journeyDate(),
+                    effectivePreference,
+                    request.passengers().size());
         } catch (ResponseStatusException ex) {
             if (HttpStatus.CONFLICT.equals(ex.getStatusCode())) {
                 return List.of();
@@ -163,7 +178,13 @@ public class BookingOrchestrator {
         booking.scheduleId = request.scheduleId();
         booking.coachId = request.coachId();
         booking.journeyDate = request.journeyDate();
-        booking.totalFare = fareService.calculateFare(coach.getCoachType(), request.passengers().size());
+        booking.totalFare = dynamicPricingService.calculateBookingFare(
+                coach.getCoachType(),
+                request.journeyDate(),
+                request.scheduleId(),
+                request.coachId(),
+                request.tatkal(),
+                request.passengers().stream().map(PassengerRequest::age).toList());
         return bookingRepository.save(booking);
     }
 
@@ -177,6 +198,7 @@ public class BookingOrchestrator {
             passenger.firstName = passengerRequest.firstName();
             passenger.lastName = passengerRequest.lastName();
             passenger.gender = passengerRequest.gender();
+            passenger.age = passengerRequest.age();
             passenger.user = user;
             Passenger savedPassenger = passengerRepository.save(passenger);
 

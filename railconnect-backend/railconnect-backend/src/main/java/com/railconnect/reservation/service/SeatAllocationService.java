@@ -19,11 +19,14 @@ public interface SeatAllocationService {
 
     /**
      * Allocates seats within the given coach for a family/group, preferring a contiguous
-     * block of seat numbers so the party can sit together.
+     * block of seat numbers so the party can sit together. When {@code preferLowerBerth} is
+     * set (a senior-citizen passenger is in the party), the block is also preferred to include
+     * at least one LOWER berth.
      */
     List<SeatAllocation> allocateFamilySeats(
             Long scheduleId,
             Long coachId,
             LocalDate journeyDate,
-            int partySize);
+            int partySize,
+            boolean preferLowerBerth);
 }

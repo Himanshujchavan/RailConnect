@@ -7,11 +7,12 @@ public class FareServiceImpl implements FareService {
 
     @Override
     public double calculateFare(String coachType, int passengerCount) {
-        double perPassenger = coachMultiplier(coachType);
+        double perPassenger = baseRatePerPassenger(coachType);
         return round2(perPassenger * passengerCount);
     }
 
-    private double coachMultiplier(String coachType) {
+    @Override
+    public double baseRatePerPassenger(String coachType) {
         if (coachType == null) {
             return 100.0;
         }

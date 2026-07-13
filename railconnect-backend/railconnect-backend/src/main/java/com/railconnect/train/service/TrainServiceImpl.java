@@ -10,6 +10,7 @@ import com.railconnect.notification.NotificationChannel;
 import com.railconnect.notification.NotificationType;
 import com.railconnect.notification.dtorequestresponse.NotificationSendRequest;
 import com.railconnect.notification.service.NotificationService;
+import com.railconnect.realtime.event.TrainStatusChangedEvent;
 import com.railconnect.reservation.repository.BookingRepository;
 import com.railconnect.train.dtorequestresponse.TrainRequest; // Matches your actual package spelling
 import com.railconnect.train.dtorequestresponse.TrainResponse;
@@ -19,6 +20,7 @@ import com.railconnect.train.repository.TrainRepository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,17 +40,20 @@ public class TrainServiceImpl implements TrainService {
     private final ScheduleRepository scheduleRepository;
     private final BookingRepository bookingRepository;
     private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public TrainServiceImpl(TrainRepository trainRepository,
                              TrainMapper trainMapper,
                              ScheduleRepository scheduleRepository,
                              BookingRepository bookingRepository,
-                             NotificationService notificationService) {
+                             NotificationService notificationService,
+                             ApplicationEventPublisher eventPublisher) {
         this.trainRepository = trainRepository;
         this.trainMapper = trainMapper;
         this.scheduleRepository = scheduleRepository;
         this.bookingRepository = bookingRepository;
         this.notificationService = notificationService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -112,6 +117,8 @@ public class TrainServiceImpl implements TrainService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Train not found"));
         train.setStatus(status);
         Train savedTrain = trainRepository.save(train);
+
+        eventPublisher.publishEvent(new TrainStatusChangedEvent(savedTrain.getId(), status));
 
         if (status == TrainStatus.DELAYED) {
             notifyPassengersOfDelay(savedTrain);

@@ -12,8 +12,11 @@ public record CreateBookingRequest(
         @NotNull Long scheduleId,
         @NotNull Long coachId,
         @NotNull LocalDate journeyDate,
-        @NotEmpty @Valid List<PassengerRequest> passengers
-,
-        String seatPreference
+        @NotEmpty @Valid List<PassengerRequest> passengers,
+        String seatPreference,
+
+        // Dynamic Pricing: opts into Tatkal-quota pricing. Only valid within the Tatkal
+        // booking window (see DynamicPricingService); ignored (treated as false) if omitted.
+        boolean tatkal
 ) {
 }

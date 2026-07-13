@@ -83,7 +83,11 @@ public class SecurityConfig {
                     "/swagger-ui.html",
                     "/v3/api-docs/**"
                 ).permitAll()
-                
+
+                // Phase 10: health/metrics need to be reachable without a JWT - Docker's
+                // HEALTHCHECK and a k8s liveness/readiness probe don't carry one.
+                .requestMatchers("/actuator/**").permitAll()
+
                 // Everything else remains strictly protected
                 .anyRequest().authenticated()
             );
