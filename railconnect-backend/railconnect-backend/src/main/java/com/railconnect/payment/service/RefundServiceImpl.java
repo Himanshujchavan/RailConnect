@@ -18,6 +18,7 @@ import com.railconnect.payment.repository.PaymentLogRepository;
 import com.railconnect.payment.repository.PaymentRepository;
 import com.railconnect.payment.repository.RefundRepository;
 import com.railconnect.payment.repository.TransactionRepository;
+import com.railconnect.security.SecurityUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,8 +26,7 @@ import java.time.LocalDateTime;
 
 /**
  * Handles full and partial refunds against an already-settled {@link Payment}.
- * Refunds are simulated as processing synchronously and immediately (no external gateway call),
- * matching how {@link PaymentServiceImpl} simulates the payment side.
+ * Enforces ownership checks so only the booking owner or an administrator can request a refund.
  */
 @Service
 public class RefundServiceImpl implements RefundService {
@@ -36,17 +36,20 @@ public class RefundServiceImpl implements RefundService {
     private final TransactionRepository transactionRepository;
     private final PaymentLogRepository paymentLogRepository;
     private final RefundMapper refundMapper;
+    private final SecurityUtil securityUtil;
 
     public RefundServiceImpl(PaymentRepository paymentRepository,
                               RefundRepository refundRepository,
                               TransactionRepository transactionRepository,
                               PaymentLogRepository paymentLogRepository,
-                              RefundMapper refundMapper) {
+                              RefundMapper refundMapper,
+                              SecurityUtil securityUtil) {
         this.paymentRepository = paymentRepository;
         this.refundRepository = refundRepository;
         this.transactionRepository = transactionRepository;
         this.paymentLogRepository = paymentLogRepository;
         this.refundMapper = refundMapper;
+        this.securityUtil = securityUtil;
     }
 
     @Override
@@ -54,6 +57,10 @@ public class RefundServiceImpl implements RefundService {
     public RefundResponse initiateRefund(RefundRequest request) {
         Payment payment = paymentRepository.findById(request.paymentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Payment", "id", request.paymentId()));
+
+        // Ownership Verification: Only the booking owner or an admin can initiate a refund
+        Long ownerId = (payment.booking != null && payment.booking.user != null) ? payment.booking.user.id : null;
+        securityUtil.verifyUserOwnershipOrAdmin(ownerId, "request a refund for this payment");
 
         if (payment.status != PaymentStatus.PAID && payment.status != PaymentStatus.PARTIALLY_REFUNDED) {
             throw new RefundNotAllowedException("Only paid payments can be refunded.");

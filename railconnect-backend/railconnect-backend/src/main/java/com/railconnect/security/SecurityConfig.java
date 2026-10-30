@@ -2,6 +2,7 @@ package com.railconnect.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -72,9 +73,11 @@ public class SecurityConfig {
             
             // 4. Request Matcher Route Rules
             .authorizeHttpRequests(auth -> auth
-                // Public Station Endpoints for Dev Testing
-                .requestMatchers("/api/v1/stations/**").permitAll()
-                .requestMatchers("/api/v1/admin/stations/**").permitAll() 
+                // Administrative operations are strictly role-protected
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+
+                // Public Station Search & Read Endpoints
+                .requestMatchers(HttpMethod.GET, "/api/v1/stations/**").permitAll()
                 
                 // Public Identity & Documentation Paths
                 .requestMatchers(

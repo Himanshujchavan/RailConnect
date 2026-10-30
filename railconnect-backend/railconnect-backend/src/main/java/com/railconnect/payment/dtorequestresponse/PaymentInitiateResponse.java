@@ -7,6 +7,10 @@ public record PaymentInitiateResponse(
         Long bookingId,
         String transactionRef,
         Double amount,
-        PaymentStatus status
+        PaymentStatus status,
+        String gatewaySignature
 ) {
+    public PaymentInitiateResponse(Long paymentId, Long bookingId, String transactionRef, Double amount, PaymentStatus status) {
+        this(paymentId, bookingId, transactionRef, amount, status, null);
+    }
 }

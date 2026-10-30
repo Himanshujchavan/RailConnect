@@ -8,9 +8,10 @@ spring:
     password: ${DB_PASSWORD:12345678}
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: ${JPA_DDL_AUTO:update}
-    show-sql: ${JPA_SHOW_SQL:true}
+    show-sql: ${JPA_SHOW_SQL:false}
     properties:
       hibernate:
         format_sql: true
@@ -105,6 +106,6 @@ logging:
   level:
     root: INFO
     com.railconnect: ${APP_LOG_LEVEL:INFO}
-    org.hibernate.SQL: ${SQL_LOG_LEVEL:DEBUG}
+    org.hibernate.SQL: ${SQL_LOG_LEVEL:WARN}
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [reqId=%X{requestId}] %logger{36} - %msg%n"

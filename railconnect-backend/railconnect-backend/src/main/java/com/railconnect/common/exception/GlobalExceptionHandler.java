@@ -5,9 +5,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -48,6 +50,28 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException exception,
+                                                            HttpServletRequest request) {
+        ErrorResponse body = new ErrorResponse(
+                HttpStatus.FORBIDDEN.value(),
+                "AccessDeniedException",
+                exception.getMessage() != null ? exception.getMessage() : "Access denied: insufficient permissions"
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatusException(ResponseStatusException exception,
+                                                                       HttpServletRequest request) {
+        ErrorResponse body = new ErrorResponse(
+                exception.getStatusCode().value(),
+                exception.getClass().getSimpleName(),
+                exception.getReason() != null ? exception.getReason() : exception.getMessage()
+        );
+        return ResponseEntity.status(exception.getStatusCode()).body(body);
+    }
+
     /**
      * ResourceNotFoundException carries its own @ResponseStatus, but that annotation is only
      * honored by Spring's fallback ResponseStatusExceptionResolver - which never runs here
@@ -82,7 +106,7 @@ public class GlobalExceptionHandler {
         ErrorResponse body = new ErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 exception.getClass().getSimpleName(),
-                "Unexpected error occurred"
+                "Unexpected error occurred: " + exception.getMessage()
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }

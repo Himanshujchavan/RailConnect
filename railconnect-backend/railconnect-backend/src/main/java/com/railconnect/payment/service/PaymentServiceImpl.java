@@ -17,6 +17,7 @@ import com.railconnect.payment.dtorequestresponse.PaymentHistoryResponse;
 import com.railconnect.payment.dtorequestresponse.PaymentInitiateRequest;
 import com.railconnect.payment.dtorequestresponse.PaymentInitiateResponse;
 import com.railconnect.payment.dtorequestresponse.PaymentResponse;
+import com.railconnect.payment.dtorequestresponse.RefundEstimateResponse;
 import com.railconnect.payment.dtorequestresponse.RefundResponse;
 import com.railconnect.payment.dtorequestresponse.TransactionResponse;
 import com.railconnect.payment.mapper.PaymentMapper;
@@ -27,6 +28,9 @@ import com.railconnect.payment.repository.PaymentRepository;
 import com.railconnect.payment.repository.RefundRepository;
 import com.railconnect.payment.repository.TransactionRepository;
 import com.railconnect.reservation.repository.BookingRepository;
+import com.railconnect.security.SecurityUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,13 +40,16 @@ import java.util.List;
 /**
  * Phase 4 — Payment Module.
  * <p>
- * Simulates a payment-gateway integration: {@code initiate} creates a PENDING payment and hands
- * back a transaction reference, then the gateway (or, in tests/dev, the client directly) calls
- * back into {@code success}/{@code failure} to settle it. {@link Transaction} rows keep an
- * immutable history of every attempt; {@link PaymentLog} keeps a plain-text audit trail alongside it.
+ * Simulates a payment-gateway integration: {@code initiate} creates a PENDING payment, computes
+ * a cryptographic gateway signature, and hands back the transaction reference and signature.
+ * Callbacks to {@code success}/{@code failure} cryptographically verify the signature before
+ * updating state. All access to payment history, invoices, and payment initiation strictly
+ * enforces user ownership or administrative privileges.
  */
 @Service
 public class PaymentServiceImpl implements PaymentService {
+
+    private static final Logger logger = LoggerFactory.getLogger(PaymentServiceImpl.class);
 
     private final PaymentRepository paymentRepository;
     private final TransactionRepository transactionRepository;
@@ -52,6 +59,9 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentMapper paymentMapper;
     private final TransactionMapper transactionMapper;
     private final RefundMapper refundMapper;
+    private final PaymentGatewaySignatureService signatureService;
+    private final SecurityUtil securityUtil;
+    private final RefundCalculationService refundCalculationService;
 
     public PaymentServiceImpl(PaymentRepository paymentRepository,
                                TransactionRepository transactionRepository,
@@ -60,7 +70,10 @@ public class PaymentServiceImpl implements PaymentService {
                                BookingRepository bookingRepository,
                                PaymentMapper paymentMapper,
                                TransactionMapper transactionMapper,
-                               RefundMapper refundMapper) {
+                               RefundMapper refundMapper,
+                               PaymentGatewaySignatureService signatureService,
+                               SecurityUtil securityUtil,
+                               RefundCalculationService refundCalculationService) {
         this.paymentRepository = paymentRepository;
         this.transactionRepository = transactionRepository;
         this.paymentLogRepository = paymentLogRepository;
@@ -69,6 +82,9 @@ public class PaymentServiceImpl implements PaymentService {
         this.paymentMapper = paymentMapper;
         this.transactionMapper = transactionMapper;
         this.refundMapper = refundMapper;
+        this.signatureService = signatureService;
+        this.securityUtil = securityUtil;
+        this.refundCalculationService = refundCalculationService;
     }
 
     @Override
@@ -77,14 +93,19 @@ public class PaymentServiceImpl implements PaymentService {
         Booking booking = bookingRepository.findById(request.bookingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Booking", "id", request.bookingId()));
 
+        // Ownership Verification: Only the booking owner or an admin can initiate payment
+        Long ownerId = booking.user != null ? booking.user.id : null;
+        securityUtil.verifyUserOwnershipOrAdmin(ownerId, "initiate payment for this booking");
+
         Payment existing = paymentRepository.findByBookingId(booking.id).orElse(null);
         if (existing != null && existing.status == PaymentStatus.PAID) {
             throw new PaymentFailedException("This booking has already been paid for.");
         }
         if (existing != null && existing.status == PaymentStatus.PENDING) {
-            // Idempotent: re-initiating an in-flight payment just hands back the same reference.
+            // Idempotent: re-initiating an in-flight payment generates signature and hands back the same reference.
+            String signature = signatureService.generateSignature(existing.transactionRef, existing.amount, booking.id);
             return new PaymentInitiateResponse(existing.id, booking.id, existing.transactionRef,
-                    existing.amount, existing.status);
+                    existing.amount, existing.status, signature);
         }
 
         Payment payment = existing != null ? existing : new Payment();
@@ -108,8 +129,10 @@ public class PaymentServiceImpl implements PaymentService {
 
         log(payment, "INITIATED", "Payment initiated via " + request.paymentMethod());
 
+        String signature = signatureService.generateSignature(payment.transactionRef, payment.amount, booking.id);
+
         return new PaymentInitiateResponse(payment.id, booking.id, payment.transactionRef,
-                payment.amount, payment.status);
+                payment.amount, payment.status, signature);
     }
 
     @Override
@@ -119,11 +142,26 @@ public class PaymentServiceImpl implements PaymentService {
         Transaction transaction = findTransaction(request.transactionRef());
 
         if (payment.status == PaymentStatus.PAID) {
-            // Already settled - treat repeat gateway callbacks as a no-op instead of erroring.
+            // Already settled - idempotent repeat callback
             return paymentMapper.toResponse(payment);
         }
         if (payment.status == PaymentStatus.FAILED) {
             throw new PaymentFailedException("Cannot mark an already-failed payment as successful.");
+        }
+
+        // Gateway Signature Verification: ensure callback is genuine
+        boolean isValidSignature = signatureService.verifySignature(
+                payment.transactionRef,
+                payment.amount,
+                payment.booking != null ? payment.booking.id : null,
+                request.signature()
+        );
+
+        if (!isValidSignature) {
+            log(payment, "SIGNATURE_VERIFICATION_FAILED",
+                    "Invalid gateway signature received for transactionRef: " + request.transactionRef());
+            logger.warn("Rejected unauthorized payment success callback for transactionRef: {}", request.transactionRef());
+            throw new PaymentFailedException("Payment verification failed: invalid gateway signature.");
         }
 
         payment.status = PaymentStatus.PAID;
@@ -149,6 +187,19 @@ public class PaymentServiceImpl implements PaymentService {
             throw new PaymentFailedException("Cannot mark an already-paid payment as failed.");
         }
 
+        // If a signature is provided, verify it
+        if (request.signature() != null && !request.signature().isBlank()) {
+            boolean isValidSignature = signatureService.verifySignature(
+                    payment.transactionRef,
+                    payment.amount,
+                    payment.booking != null ? payment.booking.id : null,
+                    request.signature()
+            );
+            if (!isValidSignature) {
+                logger.warn("Received invalid signature on failure callback for ref: {}", request.transactionRef());
+            }
+        }
+
         payment.status = PaymentStatus.FAILED;
         paymentRepository.save(payment);
 
@@ -164,6 +215,13 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional(readOnly = true)
     public PaymentHistoryResponse getHistory(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking", "id", bookingId));
+
+        // Ownership Verification
+        Long ownerId = booking.user != null ? booking.user.id : null;
+        securityUtil.verifyUserOwnershipOrAdmin(ownerId, "view payment history for this booking");
+
         Payment payment = paymentRepository.findByBookingId(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment", "bookingId", bookingId));
 
@@ -187,6 +245,10 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment", "id", paymentId));
 
+        // Ownership Verification
+        Long ownerId = (payment.booking != null && payment.booking.user != null) ? payment.booking.user.id : null;
+        securityUtil.verifyUserOwnershipOrAdmin(ownerId, "view invoice for this payment");
+
         if (payment.status == PaymentStatus.PENDING || payment.status == PaymentStatus.FAILED) {
             throw new PaymentFailedException("Invoice is only available once payment has been completed.");
         }
@@ -202,6 +264,28 @@ public class PaymentServiceImpl implements PaymentService {
                 payment.paidAt,
                 LocalDateTime.now()
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaymentResponse getPaymentStatus(String transactionRef) {
+        Payment payment = findByRef(transactionRef);
+        Long ownerId = (payment.booking != null && payment.booking.user != null) ? payment.booking.user.id : null;
+        securityUtil.verifyUserOwnershipOrAdmin(ownerId, "view payment status");
+        return paymentMapper.toResponse(payment);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RefundEstimateResponse getRefundEstimate(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking", "id", bookingId));
+
+        Long ownerId = booking.user != null ? booking.user.id : null;
+        securityUtil.verifyUserOwnershipOrAdmin(ownerId, "view refund estimate for this booking");
+
+        Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
+        return refundCalculationService.calculateRefund(booking, payment, LocalDateTime.now());
     }
 
     private Payment findByRef(String transactionRef) {

@@ -13,6 +13,7 @@ import com.railconnect.notification.dtorequestresponse.NotificationResponse;
 import com.railconnect.notification.dtorequestresponse.NotificationSendRequest;
 import com.railconnect.notification.mapper.NotificationMapper;
 import com.railconnect.notification.repository.NotificationRepository;
+import com.railconnect.security.SecurityUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -43,6 +44,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationProvider smsProvider;
     private final NotificationProvider pushProvider;
     private final NotificationProvider inAppProvider;
+    private final SecurityUtil securityUtil;
 
     public NotificationServiceImpl(UserRepository userRepository,
                                     NotificationRepository notificationRepository,
@@ -50,7 +52,8 @@ public class NotificationServiceImpl implements NotificationService {
                                     @Qualifier("emailNotificationProvider") NotificationProvider emailProvider,
                                     @Qualifier("smsNotificationProvider") NotificationProvider smsProvider,
                                     @Qualifier("pushNotificationProvider") NotificationProvider pushProvider,
-                                    @Qualifier("inAppNotificationProvider") NotificationProvider inAppProvider) {
+                                    @Qualifier("inAppNotificationProvider") NotificationProvider inAppProvider,
+                                    SecurityUtil securityUtil) {
         this.userRepository = userRepository;
         this.notificationRepository = notificationRepository;
         this.notificationMapper = notificationMapper;
@@ -58,6 +61,7 @@ public class NotificationServiceImpl implements NotificationService {
         this.smsProvider = smsProvider;
         this.pushProvider = pushProvider;
         this.inAppProvider = inAppProvider;
+        this.securityUtil = securityUtil;
     }
 
     @Override
@@ -97,6 +101,7 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional(readOnly = true)
     public List<NotificationResponse> getHistory(Long userId) {
+        securityUtil.verifyUserOwnershipOrAdmin(userId, "view notification history");
         return notificationMapper.toResponseList(
                 notificationRepository.findByUserIdOrderBySentAtDesc(userId));
     }
@@ -106,6 +111,8 @@ public class NotificationServiceImpl implements NotificationService {
     public NotificationResponse markAsRead(Long notificationId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Notification", "id", notificationId));
+        Long ownerId = notification.getUser() != null ? notification.getUser().id : null;
+        securityUtil.verifyUserOwnershipOrAdmin(ownerId, "update this notification");
         notification.setRead(true);
         return notificationMapper.toResponse(notificationRepository.save(notification));
     }

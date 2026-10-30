@@ -6,6 +6,7 @@ import com.railconnect.payment.dtorequestresponse.PaymentHistoryResponse;
 import com.railconnect.payment.dtorequestresponse.PaymentInitiateRequest;
 import com.railconnect.payment.dtorequestresponse.PaymentInitiateResponse;
 import com.railconnect.payment.dtorequestresponse.PaymentResponse;
+import com.railconnect.payment.dtorequestresponse.RefundEstimateResponse;
 
 public interface PaymentService {
 
@@ -18,4 +19,8 @@ public interface PaymentService {
     PaymentHistoryResponse getHistory(Long bookingId);
 
     InvoiceResponse getInvoice(Long paymentId);
+
+    PaymentResponse getPaymentStatus(String transactionRef);
+
+    RefundEstimateResponse getRefundEstimate(Long bookingId);
 }

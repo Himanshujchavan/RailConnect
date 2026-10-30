@@ -6,6 +6,7 @@ import com.railconnect.payment.dtorequestresponse.PaymentHistoryResponse;
 import com.railconnect.payment.dtorequestresponse.PaymentInitiateRequest;
 import com.railconnect.payment.dtorequestresponse.PaymentInitiateResponse;
 import com.railconnect.payment.dtorequestresponse.PaymentResponse;
+import com.railconnect.payment.dtorequestresponse.RefundEstimateResponse;
 import com.railconnect.payment.dtorequestresponse.RefundRequest;
 import com.railconnect.payment.dtorequestresponse.RefundResponse;
 import com.railconnect.payment.service.PaymentService;
@@ -64,5 +65,15 @@ public class PaymentController {
     @GetMapping("/payment/{paymentId}/invoice")
     public ResponseEntity<InvoiceResponse> invoice(@PathVariable Long paymentId) {
         return ResponseEntity.ok(paymentService.getInvoice(paymentId));
+    }
+
+    @GetMapping("/payment/status/{transactionRef}")
+    public ResponseEntity<PaymentResponse> paymentStatus(@PathVariable String transactionRef) {
+        return ResponseEntity.ok(paymentService.getPaymentStatus(transactionRef));
+    }
+
+    @GetMapping("/payment/estimate-refund/{bookingId}")
+    public ResponseEntity<RefundEstimateResponse> estimateRefund(@PathVariable Long bookingId) {
+        return ResponseEntity.ok(paymentService.getRefundEstimate(bookingId));
     }
 }
