@@ -68,11 +68,11 @@ public class RecommendationServiceImpl implements RecommendationService {
         Map<Long, Long> countByScheduleId = new HashMap<>();
         Map<Long, LocalDate> lastTravelledByScheduleId = new HashMap<>();
         for (Booking booking : bookings) {
-            if (booking.scheduleId == null) {
+            if (booking.getScheduleId() == null) {
                 continue;
             }
-            countByScheduleId.merge(booking.scheduleId, 1L, Long::sum);
-            lastTravelledByScheduleId.merge(booking.scheduleId, booking.journeyDate,
+            countByScheduleId.merge(booking.getScheduleId(), 1L, Long::sum);
+            lastTravelledByScheduleId.merge(booking.getScheduleId(), booking.getJourneyDate(),
                     (a, b) -> a.isAfter(b) ? a : b);
         }
 
@@ -204,7 +204,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
 
         Set<Long> coachIds = bookings.stream()
-                .map(b -> b.coachId)
+                .map(Booking::getCoachId)
                 .filter(id -> id != null)
                 .collect(Collectors.toSet());
         List<Coach> coaches = coachRepository.findAllById(coachIds);
@@ -213,7 +213,7 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         Map<String, Long> countByType = new HashMap<>();
         for (Booking booking : bookings) {
-            String coachType = coachTypeById.get(booking.coachId);
+            String coachType = coachTypeById.get(booking.getCoachId());
             if (coachType != null) {
                 countByType.merge(coachType, 1L, Long::sum);
             }

@@ -67,6 +67,9 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public List<NotificationResponse> send(NotificationSendRequest request) {
+        // Enforce that only the target user themselves or an administrator can dispatch notifications
+        securityUtil.verifyUserOwnershipOrAdmin(request.userId(), "send a notification for this user");
+
         User user = userRepository.findById(request.userId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", request.userId()));
 

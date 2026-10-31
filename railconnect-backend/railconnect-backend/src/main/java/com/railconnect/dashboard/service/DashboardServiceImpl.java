@@ -16,6 +16,7 @@ import com.railconnect.entity.User;
 import com.railconnect.notification.dtorequestresponse.NotificationResponse;
 import com.railconnect.notification.service.NotificationService;
 import com.railconnect.reservation.repository.BookingRepository;
+import com.railconnect.security.SecurityUtil;
 import com.railconnect.train.repository.RouteRepository;
 import com.railconnect.user.dtorequestresponse.PassengerResponse;
 import com.railconnect.user.dtorequestresponse.UpdateProfileRequest;
@@ -43,6 +44,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final UserMapper userMapper;
     private final PassengerMapper passengerMapper;
     private final DashboardMapper dashboardMapper;
+    private final SecurityUtil securityUtil;
 
     public DashboardServiceImpl(UserRepository userRepository,
                                  PassengerRepository passengerRepository,
@@ -52,7 +54,8 @@ public class DashboardServiceImpl implements DashboardService {
                                  NotificationService notificationService,
                                  UserMapper userMapper,
                                  PassengerMapper passengerMapper,
-                                 DashboardMapper dashboardMapper) {
+                                 DashboardMapper dashboardMapper,
+                                 SecurityUtil securityUtil) {
         this.userRepository = userRepository;
         this.passengerRepository = passengerRepository;
         this.bookingRepository = bookingRepository;
@@ -62,6 +65,7 @@ public class DashboardServiceImpl implements DashboardService {
         this.userMapper = userMapper;
         this.passengerMapper = passengerMapper;
         this.dashboardMapper = dashboardMapper;
+        this.securityUtil = securityUtil;
     }
 
     // --- Profile ---
@@ -207,6 +211,7 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     private User findUser(Long userId) {
+        securityUtil.verifyUserOwnershipOrAdmin(userId, "access this user dashboard resource");
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
     }

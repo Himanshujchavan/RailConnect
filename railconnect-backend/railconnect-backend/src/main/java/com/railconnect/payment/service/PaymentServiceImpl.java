@@ -94,23 +94,23 @@ public class PaymentServiceImpl implements PaymentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Booking", "id", request.bookingId()));
 
         // Ownership Verification: Only the booking owner or an admin can initiate payment
-        Long ownerId = booking.user != null ? booking.user.id : null;
+        Long ownerId = booking.getUser() != null ? booking.getUser().id : null;
         securityUtil.verifyUserOwnershipOrAdmin(ownerId, "initiate payment for this booking");
 
-        Payment existing = paymentRepository.findByBookingId(booking.id).orElse(null);
+        Payment existing = paymentRepository.findByBookingId(booking.getId()).orElse(null);
         if (existing != null && existing.status == PaymentStatus.PAID) {
             throw new PaymentFailedException("This booking has already been paid for.");
         }
         if (existing != null && existing.status == PaymentStatus.PENDING) {
             // Idempotent: re-initiating an in-flight payment generates signature and hands back the same reference.
-            String signature = signatureService.generateSignature(existing.transactionRef, existing.amount, booking.id);
-            return new PaymentInitiateResponse(existing.id, booking.id, existing.transactionRef,
+            String signature = signatureService.generateSignature(existing.transactionRef, existing.amount, booking.getId());
+            return new PaymentInitiateResponse(existing.id, booking.getId(), existing.transactionRef,
                     existing.amount, existing.status, signature);
         }
 
         Payment payment = existing != null ? existing : new Payment();
         payment.booking = booking;
-        payment.amount = booking.totalFare;
+        payment.amount = booking.getTotalFare();
         payment.paymentMethod = request.paymentMethod();
         payment.status = PaymentStatus.PENDING;
         payment.transactionRef = TransactionRefGenerator.generate();
@@ -129,9 +129,9 @@ public class PaymentServiceImpl implements PaymentService {
 
         log(payment, "INITIATED", "Payment initiated via " + request.paymentMethod());
 
-        String signature = signatureService.generateSignature(payment.transactionRef, payment.amount, booking.id);
+        String signature = signatureService.generateSignature(payment.transactionRef, payment.amount, booking.getId());
 
-        return new PaymentInitiateResponse(payment.id, booking.id, payment.transactionRef,
+        return new PaymentInitiateResponse(payment.id, booking.getId(), payment.transactionRef,
                 payment.amount, payment.status, signature);
     }
 
@@ -153,7 +153,7 @@ public class PaymentServiceImpl implements PaymentService {
         boolean isValidSignature = signatureService.verifySignature(
                 payment.transactionRef,
                 payment.amount,
-                payment.booking != null ? payment.booking.id : null,
+                payment.booking != null ? payment.booking.getId() : null,
                 request.signature()
         );
 
@@ -192,7 +192,7 @@ public class PaymentServiceImpl implements PaymentService {
             boolean isValidSignature = signatureService.verifySignature(
                     payment.transactionRef,
                     payment.amount,
-                    payment.booking != null ? payment.booking.id : null,
+                    payment.booking != null ? payment.booking.getId() : null,
                     request.signature()
             );
             if (!isValidSignature) {
@@ -219,7 +219,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Booking", "id", bookingId));
 
         // Ownership Verification
-        Long ownerId = booking.user != null ? booking.user.id : null;
+        Long ownerId = booking.getUser() != null ? booking.getUser().id : null;
         securityUtil.verifyUserOwnershipOrAdmin(ownerId, "view payment history for this booking");
 
         Payment payment = paymentRepository.findByBookingId(bookingId)
@@ -246,7 +246,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Payment", "id", paymentId));
 
         // Ownership Verification
-        Long ownerId = (payment.booking != null && payment.booking.user != null) ? payment.booking.user.id : null;
+        Long ownerId = (payment.booking != null && payment.booking.getUser() != null) ? payment.booking.getUser().id : null;
         securityUtil.verifyUserOwnershipOrAdmin(ownerId, "view invoice for this payment");
 
         if (payment.status == PaymentStatus.PENDING || payment.status == PaymentStatus.FAILED) {
@@ -255,8 +255,8 @@ public class PaymentServiceImpl implements PaymentService {
 
         return new InvoiceResponse(
                 payment.id,
-                payment.booking.id,
-                payment.booking.pnrCode,
+                payment.booking.getId(),
+                payment.booking.getPnrCode(),
                 payment.transactionRef,
                 payment.amount,
                 payment.refundedAmount,
@@ -270,7 +270,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional(readOnly = true)
     public PaymentResponse getPaymentStatus(String transactionRef) {
         Payment payment = findByRef(transactionRef);
-        Long ownerId = (payment.booking != null && payment.booking.user != null) ? payment.booking.user.id : null;
+        Long ownerId = (payment.booking != null && payment.booking.getUser() != null) ? payment.booking.getUser().id : null;
         securityUtil.verifyUserOwnershipOrAdmin(ownerId, "view payment status");
         return paymentMapper.toResponse(payment);
     }
@@ -281,7 +281,7 @@ public class PaymentServiceImpl implements PaymentService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking", "id", bookingId));
 
-        Long ownerId = booking.user != null ? booking.user.id : null;
+        Long ownerId = booking.getUser() != null ? booking.getUser().id : null;
         securityUtil.verifyUserOwnershipOrAdmin(ownerId, "view refund estimate for this booking");
 
         Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);

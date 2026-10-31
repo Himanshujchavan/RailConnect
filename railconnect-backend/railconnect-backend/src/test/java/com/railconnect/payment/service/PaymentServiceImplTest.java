@@ -77,9 +77,9 @@ class PaymentServiceImplTest {
         testUser.username = "testuser";
 
         testBooking = new Booking();
-        testBooking.id = 10L;
-        testBooking.user = testUser;
-        testBooking.totalFare = 850.0;
+        testBooking.setId(10L);
+        testBooking.setUser(testUser);
+        testBooking.setTotalFare(850.0);
 
         testPayment = new Payment();
         testPayment.id = 100L;

@@ -25,7 +25,7 @@ public class RefundCalculationServiceImpl implements RefundCalculationService {
     public RefundEstimateResponse calculateRefund(Booking booking, Payment payment, LocalDateTime cancellationTime) {
         if (payment == null || payment.amount == null) {
             return new RefundEstimateResponse(
-                    booking.id, null, 0.0, 0.0, 0.0, 0.0, "No payment found"
+                    booking.getId(), null, 0.0, 0.0, 0.0, 0.0, "No payment found"
             );
         }
 
@@ -34,7 +34,7 @@ public class RefundCalculationServiceImpl implements RefundCalculationService {
 
         if (remainingBalance <= 0) {
             return new RefundEstimateResponse(
-                    booking.id, payment.id, payment.amount, alreadyRefunded, 0.0, 0.0,
+                    booking.getId(), payment.id, payment.amount, alreadyRefunded, 0.0, 0.0,
                     "Payment has already been fully refunded"
             );
         }
@@ -43,11 +43,11 @@ public class RefundCalculationServiceImpl implements RefundCalculationService {
         LocalDateTime cancelTime = cancellationTime != null ? cancellationTime : LocalDateTime.now();
 
         // If ticket is in WAITING_LIST or RAC status, apply flat clerkage charge
-        if (booking.status == BookingStatus.WAITING_LIST || booking.status == BookingStatus.RAC) {
+        if (booking.getStatus() == BookingStatus.WAITING_LIST || booking.getStatus() == BookingStatus.RAC) {
             double fee = Math.min(60.0, remainingBalance);
             double refund = Math.max(0.0, remainingBalance - fee);
             return new RefundEstimateResponse(
-                    booking.id, payment.id, payment.amount, alreadyRefunded, fee, refund,
+                    booking.getId(), payment.id, payment.amount, alreadyRefunded, fee, refund,
                     "RAC/Waitlist cancellation policy: flat nominal charge applied"
             );
         }
@@ -79,7 +79,7 @@ public class RefundCalculationServiceImpl implements RefundCalculationService {
         double eligibleRefund = Math.max(0.0, remainingBalance - cancellationFee);
 
         return new RefundEstimateResponse(
-                booking.id,
+                booking.getId(),
                 payment.id,
                 payment.amount,
                 alreadyRefunded,
@@ -90,15 +90,17 @@ public class RefundCalculationServiceImpl implements RefundCalculationService {
     }
 
     private LocalDateTime getDepartureDateTime(Booking booking) {
-        if (booking.journeyDate == null) {
+        if (booking.getJourneyDate() == null) {
             return LocalDateTime.now().plusDays(3);
         }
         LocalTime departureTime = LocalTime.of(8, 0); // default morning departure
-        if (booking.scheduleId != null) {
-            departureTime = scheduleRepository.findById(booking.scheduleId)
-                    .map(Schedule::getDepartureTime)
-                    .orElse(departureTime);
+        // Use the schedule relationship if available
+        if (booking.getSchedule() != null) {
+            LocalTime schedTime = booking.getSchedule().getDepartureTime();
+            if (schedTime != null) {
+                departureTime = schedTime;
+            }
         }
-        return booking.journeyDate.atTime(departureTime);
+        return booking.getJourneyDate().atTime(departureTime);
     }
 }

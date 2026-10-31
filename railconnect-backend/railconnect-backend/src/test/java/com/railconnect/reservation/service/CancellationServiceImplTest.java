@@ -8,6 +8,7 @@ import com.railconnect.entity.BookingPassenger;
 import com.railconnect.entity.Coach;
 import com.railconnect.entity.Payment;
 import com.railconnect.entity.SeatAllocation;
+import com.railconnect.entity.Schedule;
 import com.railconnect.entity.User;
 import com.railconnect.notification.service.NotificationService;
 import com.railconnect.payment.dtorequestresponse.RefundEstimateResponse;
@@ -70,6 +71,7 @@ class CancellationServiceImplTest {
     private User testUser;
     private Booking testBooking;
     private Coach testCoach;
+    private Schedule testSchedule;
     private Payment testPayment;
 
     @BeforeEach
@@ -85,13 +87,16 @@ class CancellationServiceImplTest {
                 .position(1)
                 .build();
 
+        testSchedule = new Schedule();
+        testSchedule.setId(1L);
+
         testBooking = new Booking();
-        testBooking.id = 80L;
-        testBooking.user = testUser;
-        testBooking.coachId = 20L;
-        testBooking.scheduleId = 1L;
-        testBooking.journeyDate = LocalDate.now().plusDays(5);
-        testBooking.status = BookingStatus.CONFIRMED;
+        testBooking.setId(80L);
+        testBooking.setUser(testUser);
+        testBooking.setCoach(testCoach);
+        testBooking.setSchedule(testSchedule);
+        testBooking.setJourneyDate(LocalDate.now().plusDays(5));
+        testBooking.setStatus(BookingStatus.CONFIRMED);
 
         SeatAllocation allocation = new SeatAllocation();
         allocation.setStatus("CONFIRMED");
@@ -101,7 +106,7 @@ class CancellationServiceImplTest {
 
         List<BookingPassenger> passengers = new ArrayList<>();
         passengers.add(passenger);
-        testBooking.bookingPassengers = passengers;
+        testBooking.setBookingPassengers(passengers);
 
         testPayment = new Payment();
         testPayment.id = 800L;
@@ -149,7 +154,7 @@ class CancellationServiceImplTest {
     @Test
     @DisplayName("Should throw ResponseStatusException when booking is already cancelled")
     void testCancelAlreadyCancelledBooking() {
-        testBooking.status = BookingStatus.CANCELLED;
+        testBooking.setStatus(BookingStatus.CANCELLED);
         when(bookingRepository.findById(80L)).thenReturn(Optional.of(testBooking));
 
         assertThrows(ResponseStatusException.class, () -> cancellationService.cancelBooking(80L, "Duplicate cancel"));

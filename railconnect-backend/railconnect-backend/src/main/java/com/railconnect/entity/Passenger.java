@@ -2,9 +2,15 @@ package com.railconnect.entity;
 
 import com.railconnect.common.enums.Gender;
 import jakarta.persistence.*;
+import lombok.*;
 
 @Entity
 @Table(name = "passengers")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Passenger {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,6 +26,4 @@ public class Passenger {
     @ManyToOne
     @JoinColumn(name = "user_id")
     public User user;
-
-    public Passenger() {}
 }

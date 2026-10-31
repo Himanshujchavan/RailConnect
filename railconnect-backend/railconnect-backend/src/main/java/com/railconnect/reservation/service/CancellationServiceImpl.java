@@ -35,7 +35,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Phase 3 & 4 — Cancellation and Refund.
+ * Phase 3 &amp; 4 — Cancellation and Refund.
  * <p>
  * Flow: Verify Ownership -> Cancel Booking -> Free Seats -> Upgrade RAC -> Upgrade WL
  * -> Process Eligible Refund (Phase 4) -> Send Notification.
@@ -85,20 +85,21 @@ public class CancellationServiceImpl implements CancellationService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
 
         // Ownership Verification: Ensure requester owns the booking or is an admin
-        Long ownerId = booking.user != null ? booking.user.id : null;
+        Long ownerId = booking.getUser() != null ? booking.getUser().id : null;
         securityUtil.verifyUserOwnershipOrAdmin(ownerId, "cancel this booking");
 
-        if (booking.status == BookingStatus.CANCELLED) {
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Booking is already cancelled");
         }
 
         int seatsFreed = freeSeats(booking);
 
-        booking.status = BookingStatus.CANCELLED;
+        booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
 
         if (seatsFreed > 0) {
-            eventPublisher.publishEvent(new SeatAvailabilityChangedEvent(booking.scheduleId, booking.journeyDate));
+            Long scheduleId = booking.getScheduleId();
+            eventPublisher.publishEvent(new SeatAvailabilityChangedEvent(scheduleId, booking.getJourneyDate()));
         }
 
         notifyCancellation(booking, reason);
@@ -112,8 +113,8 @@ public class CancellationServiceImpl implements CancellationService {
                 + (refundSummary != null ? refundSummary : "");
 
         return new CancellationResponse(
-                booking.id,
-                booking.status,
+                booking.getId(),
+                booking.getStatus(),
                 seatsFreed,
                 message
         );
@@ -125,7 +126,7 @@ public class CancellationServiceImpl implements CancellationService {
      */
     private String processAutomaticRefund(Booking booking, String reason) {
         try {
-            Payment payment = paymentRepository.findByBookingId(booking.id).orElse(null);
+            Payment payment = paymentRepository.findByBookingId(booking.getId()).orElse(null);
             if (payment == null || (payment.status != PaymentStatus.PAID && payment.status != PaymentStatus.PARTIALLY_REFUNDED)) {
                 return null;
             }
@@ -143,7 +144,7 @@ public class CancellationServiceImpl implements CancellationService {
                 return " | Non-refundable (" + estimate.policyApplied() + ")";
             }
         } catch (Exception ex) {
-            logger.warn("Automatic refund processing failed for booking {}: {}", booking.id, ex.getMessage());
+            logger.warn("Automatic refund processing failed for booking {}: {}", booking.getId(), ex.getMessage());
             return null;
         }
     }
@@ -154,11 +155,11 @@ public class CancellationServiceImpl implements CancellationService {
      */
     private int freeSeats(Booking booking) {
         int freed = 0;
-        if (booking.bookingPassengers == null) {
+        if (booking.getBookingPassengers() == null) {
             return freed;
         }
 
-        for (BookingPassenger bookingPassenger : booking.bookingPassengers) {
+        for (BookingPassenger bookingPassenger : booking.getBookingPassengers()) {
             SeatAllocation allocation = bookingPassenger.getSeatAllocation();
             if (allocation != null && !"CANCELLED".equals(allocation.getStatus())) {
                 allocation.setStatus("CANCELLED");
@@ -174,21 +175,21 @@ public class CancellationServiceImpl implements CancellationService {
      * failure interrupt the cancellation itself.
      */
     private void notifyCancellation(Booking booking, String reason) {
-        if (booking.user == null) {
+        if (booking.getUser() == null) {
             return;
         }
-        String details = (booking.pnrCode != null ? "PNR " + booking.pnrCode : "")
+        String details = (booking.getPnrCode() != null ? "PNR " + booking.getPnrCode() : "")
                 + (reason != null && !reason.isBlank() ? " (" + reason + ")" : "");
         try {
             notificationService.send(new NotificationSendRequest(
-                    booking.user.id,
+                    booking.getUser().id,
                     NotificationType.BOOKING_CANCELLED,
                     List.of(NotificationChannel.EMAIL, NotificationChannel.IN_APP),
                     details.isBlank() ? null : details.trim(),
                     null,
                     null));
         } catch (Exception ex) {
-            logger.warn("Failed to send cancellation notification for booking {}: {}", booking.id, ex.getMessage());
+            logger.warn("Failed to send cancellation notification for booking {}: {}", booking.getId(), ex.getMessage());
         }
     }
 
@@ -201,12 +202,17 @@ public class CancellationServiceImpl implements CancellationService {
             return;
         }
 
-        String vacatedCoachType = coachRepository.findById(booking.coachId)
-                .map(Coach::getCoachType)
-                .orElse(null);
+        Long coachId = booking.getCoachId();
+        Long scheduleId = booking.getScheduleId();
+
+        String vacatedCoachType = coachId != null
+                ? coachRepository.findById(coachId)
+                        .map(Coach::getCoachType)
+                        .orElse(null)
+                : null;
 
         for (int i = 0; i < seatsFreed; i++) {
-            waitingListService.processUpgradesOnCancellation(booking.scheduleId, booking.journeyDate, vacatedCoachType);
+            waitingListService.processUpgradesOnCancellation(scheduleId, booking.getJourneyDate(), vacatedCoachType);
         }
     }
 }

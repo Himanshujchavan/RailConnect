@@ -102,7 +102,7 @@ public class BookingOrchestrator {
 
         String pnrCode = generateAndAttachPnr(savedBooking);
 
-        if (savedBooking.status == BookingStatus.CONFIRMED) {
+        if (savedBooking.getStatus() == BookingStatus.CONFIRMED) {
             notifyBookingConfirmed(user, pnrCode);
         }
 
@@ -110,18 +110,22 @@ public class BookingOrchestrator {
                 .map(a -> a.getSeat().getId())
                 .toList();
 
+        // Retrieve schedule and coach IDs from the saved booking's relationships
+        Long scheduleId = savedBooking.getScheduleId();
+        Long coachId = savedBooking.getCoachId();
+
         return new BookingConfirmationResponse(
-                savedBooking.id,
+                savedBooking.getId(),
                 pnrCode,
-                savedBooking.createdAt,
-                savedBooking.status,
+                savedBooking.getCreatedAt(),
+                savedBooking.getStatus(),
                 user.id,
-                savedBooking.scheduleId,
-                savedBooking.coachId,
-                savedBooking.journeyDate,
-                savedBooking.totalFare,
+                scheduleId,
+                coachId,
+                savedBooking.getJourneyDate(),
+                savedBooking.getTotalFare(),
                 seatIds,
-                bookingPassengers.stream().map(bp -> bp.id).toList()
+                bookingPassengers.stream().map(bp -> bp.getId()).toList()
         );
     }
 
@@ -170,21 +174,21 @@ public class BookingOrchestrator {
 
     private Booking saveBooking(CreateBookingRequest request, User user, Coach coach, boolean seatsAllocated) {
         Booking booking = new Booking();
-        booking.createdAt = LocalDateTime.now();
+        booking.setCreatedAt(LocalDateTime.now());
         // Placeholder when seats weren't allocated — assignToWaitingList() sets the real
         // RAC vs WAITING_LIST status once we know which queue each passenger landed in.
-        booking.status = seatsAllocated ? BookingStatus.CONFIRMED : BookingStatus.WAITING_LIST;
-        booking.user = user;
-        booking.scheduleId = request.scheduleId();
-        booking.coachId = request.coachId();
-        booking.journeyDate = request.journeyDate();
-        booking.totalFare = dynamicPricingService.calculateBookingFare(
+        booking.setStatus(seatsAllocated ? BookingStatus.CONFIRMED : BookingStatus.WAITING_LIST);
+        booking.setUser(user);
+        booking.setScheduleId(request.scheduleId());
+        booking.setCoachId(request.coachId());
+        booking.setJourneyDate(request.journeyDate());
+        booking.setTotalFare(dynamicPricingService.calculateBookingFare(
                 coach.getCoachType(),
                 request.journeyDate(),
                 request.scheduleId(),
                 request.coachId(),
                 request.tatkal(),
-                request.passengers().stream().map(PassengerRequest::age).toList());
+                request.passengers().stream().map(PassengerRequest::age).toList()));
         return bookingRepository.save(booking);
     }
 
@@ -203,8 +207,8 @@ public class BookingOrchestrator {
             Passenger savedPassenger = passengerRepository.save(passenger);
 
             BookingPassenger bookingPassenger = new BookingPassenger();
-            bookingPassenger.booking = savedBooking;
-            bookingPassenger.passenger = savedPassenger;
+            bookingPassenger.setBooking(savedBooking);
+            bookingPassenger.setPassenger(savedPassenger);
 
             // Only set when seats were actually allocated; waiting-list passengers get none.
             if (i < allocations.size()) {
@@ -225,11 +229,13 @@ public class BookingOrchestrator {
     private void assignToWaitingList(Booking savedBooking, List<BookingPassenger> bookingPassengers) {
         boolean anyWaitingList = false;
 
+        Long scheduleId = savedBooking.getScheduleId();
+
         for (BookingPassenger bookingPassenger : bookingPassengers) {
             WaitingListAssignment assignment = waitingListService.addToQueue(
-                    savedBooking.scheduleId,
-                    savedBooking.journeyDate,
-                    bookingPassenger.id,
+                    scheduleId,
+                    savedBooking.getJourneyDate(),
+                    bookingPassenger.getId(),
                     0);
 
             if ("WL".equals(assignment.getQueueType())) {
@@ -237,7 +243,7 @@ public class BookingOrchestrator {
             }
         }
 
-        savedBooking.status = anyWaitingList ? BookingStatus.WAITING_LIST : BookingStatus.RAC;
+        savedBooking.setStatus(anyWaitingList ? BookingStatus.WAITING_LIST : BookingStatus.RAC);
         bookingRepository.save(savedBooking);
     }
 
@@ -283,7 +289,7 @@ public class BookingOrchestrator {
         pnr.booking = savedBooking;
         pnrRepository.save(pnr);
 
-        savedBooking.pnrCode = pnrCode;
+        savedBooking.setPnrCode(pnrCode);
         bookingRepository.save(savedBooking);
         return pnrCode;
     }

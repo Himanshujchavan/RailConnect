@@ -61,8 +61,8 @@ class RefundServiceImplTest {
         testUser.id = 5L;
 
         testBooking = new Booking();
-        testBooking.id = 50L;
-        testBooking.user = testUser;
+        testBooking.setId(50L);
+        testBooking.setUser(testUser);
 
         testPayment = new Payment();
         testPayment.id = 500L;

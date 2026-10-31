@@ -98,9 +98,9 @@ public class ReportServiceImpl implements ReportService {
         Map<String, Long> byStatus = new HashMap<>();
 
         for (Booking booking : bookings) {
-            int passengerCount = booking.bookingPassengers == null ? 0 : booking.bookingPassengers.size();
+            int passengerCount = booking.getBookingPassengers() == null ? 0 : booking.getBookingPassengers().size();
             totalPassengers += passengerCount;
-            String statusKey = booking.status != null ? booking.status.name() : "UNKNOWN";
+            String statusKey = booking.getStatus() != null ? booking.getStatus().name() : "UNKNOWN";
             byStatus.merge(statusKey, (long) passengerCount, Long::sum);
         }
 
@@ -137,8 +137,9 @@ public class ReportServiceImpl implements ReportService {
 
         Map<Long, Long> countByScheduleId = new HashMap<>();
         for (Booking booking : bookings) {
-            if (booking.scheduleId != null) {
-                countByScheduleId.merge(booking.scheduleId, 1L, Long::sum);
+            Long scheduleId = booking.getSchedule() != null ? booking.getSchedule().getId() : null;
+            if (scheduleId != null) {
+                countByScheduleId.merge(scheduleId, 1L, Long::sum);
             }
         }
 
@@ -249,12 +250,16 @@ public class ReportServiceImpl implements ReportService {
 
         Map<Long, Double> revenueByScheduleId = new HashMap<>();
         for (Payment payment : settledPayments) {
-            if (payment.booking == null || payment.booking.scheduleId == null) {
+            if (payment.booking == null) {
+                continue;
+            }
+            Long scheduleId = payment.booking.getSchedule() != null ? payment.booking.getSchedule().getId() : null;
+            if (scheduleId == null) {
                 continue;
             }
             double net = (payment.amount != null ? payment.amount : 0.0)
                     - (payment.refundedAmount != null ? payment.refundedAmount : 0.0);
-            revenueByScheduleId.merge(payment.booking.scheduleId, net, Double::sum);
+            revenueByScheduleId.merge(scheduleId, net, Double::sum);
         }
 
         Set<Long> scheduleIds = new LinkedHashSet<>(revenueByScheduleId.keySet());
@@ -327,8 +332,9 @@ public class ReportServiceImpl implements ReportService {
 
         Map<Long, Long> countByScheduleId = new HashMap<>();
         for (Booking booking : bookings) {
-            if (booking.scheduleId != null) {
-                countByScheduleId.merge(booking.scheduleId, 1L, Long::sum);
+            Long scheduleId = booking.getSchedule() != null ? booking.getSchedule().getId() : null;
+            if (scheduleId != null) {
+                countByScheduleId.merge(scheduleId, 1L, Long::sum);
             }
         }
 

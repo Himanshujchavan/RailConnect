@@ -1,12 +1,14 @@
 package com.railconnect.train.service;
 
 import com.railconnect.entity.BookingPassenger;
+import com.railconnect.entity.Schedule;
 import com.railconnect.entity.WaitingListAssignment;
 import com.railconnect.notification.NotificationChannel;
 import com.railconnect.notification.NotificationType;
 import com.railconnect.notification.dtorequestresponse.NotificationSendRequest;
 import com.railconnect.notification.service.NotificationService;
 import com.railconnect.reservation.repository.BookingPassengerRepository;
+import com.railconnect.train.repository.ScheduleRepository;
 import com.railconnect.train.repository.WaitingListAssignmentRepository;
 
 import org.slf4j.Logger;
@@ -29,6 +31,7 @@ public class WaitingListServiceImpl implements WaitingListService {
     private final WaitingListAssignmentRepository wlRepository;
     private final BookingPassengerRepository bookingPassengerRepository;
     private final NotificationService notificationService;
+    private final ScheduleRepository scheduleRepository;
 
     // Fixed capacity configuration thresholds for the demo rules
     private static final int MAX_RAC_LIMIT = 5;
@@ -36,10 +39,12 @@ public class WaitingListServiceImpl implements WaitingListService {
 
     public WaitingListServiceImpl(WaitingListAssignmentRepository wlRepository,
                                    BookingPassengerRepository bookingPassengerRepository,
-                                   NotificationService notificationService) {
+                                   NotificationService notificationService,
+                                   ScheduleRepository scheduleRepository) {
         this.wlRepository = wlRepository;
         this.bookingPassengerRepository = bookingPassengerRepository;
         this.notificationService = notificationService;
+        this.scheduleRepository = scheduleRepository;
     }
 
     @Override
@@ -63,8 +68,11 @@ public class WaitingListServiceImpl implements WaitingListService {
             }
         }
 
+        Schedule schedule = scheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Schedule not found with id: " + scheduleId));
+
         WaitingListAssignment assignment = WaitingListAssignment.builder()
-                .schedule(null) // Associated implicitly or load entity via repository reference
+                .schedule(schedule)
                 .journeyDate(journeyDate)
                 .bookingPassengerId(passengerId)
                 .queueType(queueType)
@@ -103,7 +111,9 @@ public class WaitingListServiceImpl implements WaitingListService {
 
                 // Re-add them into the RAC queue structure cleanly
                 int currentRacMax = wlRepository.findMaxPriorityNumber(scheduleId, journeyDate, "RAC");
+                Schedule schedule = scheduleRepository.findById(scheduleId).orElse(null);
                 WaitingListAssignment movedToRac = WaitingListAssignment.builder()
+                        .schedule(schedule)
                         .journeyDate(journeyDate)
                         .bookingPassengerId(wlPassenger.getBookingPassengerId())
                         .queueType("RAC")
@@ -126,12 +136,12 @@ public class WaitingListServiceImpl implements WaitingListService {
         try {
             BookingPassenger bookingPassenger = bookingPassengerRepository.findById(bookingPassengerId)
                     .orElse(null);
-            if (bookingPassenger == null || bookingPassenger.booking == null || bookingPassenger.booking.user == null) {
+            if (bookingPassenger == null || bookingPassenger.getBooking() == null || bookingPassenger.getBooking().getUser() == null) {
                 return;
             }
 
             notificationService.send(new NotificationSendRequest(
-                    bookingPassenger.booking.user.id,
+                    bookingPassenger.getBooking().getUser().id,
                     type,
                     List.of(NotificationChannel.EMAIL, NotificationChannel.IN_APP),
                     details,

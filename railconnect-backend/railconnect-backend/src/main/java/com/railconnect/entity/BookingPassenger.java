@@ -1,30 +1,38 @@
 package com.railconnect.entity;
 
 import jakarta.persistence.*;
+import lombok.*;
 
 @Entity
 @Table(name = "booking_passengers")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class BookingPassenger {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    public Long id;
+    private Long id;
 
     @ManyToOne
     @JoinColumn(name = "booking_id")
-    public Booking booking;
+    private Booking booking;
 
     @ManyToOne
     @JoinColumn(name = "passenger_id")
-    public Passenger passenger;
+    private Passenger passenger;
 
     // LINK ADDED: Connects this specific booking passenger ticket to their allocated seat record
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "seat_allocation_id")
     private SeatAllocation seatAllocation;
 
-    public BookingPassenger() {}
+    // New fields for PNR response
+    private String berthPreference;
+    private String seatNumber;
+    private String currentStatus;
 
-    // Getter and Setter for the new relationship mapping
     public SeatAllocation getSeatAllocation() {
         return seatAllocation;
     }

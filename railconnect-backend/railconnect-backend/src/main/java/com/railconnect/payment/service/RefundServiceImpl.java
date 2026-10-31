@@ -59,7 +59,7 @@ public class RefundServiceImpl implements RefundService {
                 .orElseThrow(() -> new ResourceNotFoundException("Payment", "id", request.paymentId()));
 
         // Ownership Verification: Only the booking owner or an admin can initiate a refund
-        Long ownerId = (payment.booking != null && payment.booking.user != null) ? payment.booking.user.id : null;
+        Long ownerId = (payment.booking != null && payment.booking.getUser() != null) ? payment.booking.getUser().id : null;
         securityUtil.verifyUserOwnershipOrAdmin(ownerId, "request a refund for this payment");
 
         if (payment.status != PaymentStatus.PAID && payment.status != PaymentStatus.PARTIALLY_REFUNDED) {

@@ -150,7 +150,7 @@ public class TrainServiceImpl implements TrainService {
         for (Booking booking : affectedBookings) {
             try {
                 notificationService.send(new NotificationSendRequest(
-                        booking.user.id,
+                        booking.getUser() != null ? booking.getUser().id : null,
                         NotificationType.TRAIN_DELAYED,
                         List.of(NotificationChannel.EMAIL, NotificationChannel.IN_APP),
                         details,
@@ -158,7 +158,7 @@ public class TrainServiceImpl implements TrainService {
                         null));
             } catch (Exception ex) {
                 logger.warn("Failed to notify user {} of delay on train {}: {}",
-                        booking.user.id, train.getNumber(), ex.getMessage());
+                        booking.getUser() != null ? booking.getUser().id : null, train.getNumber(), ex.getMessage());
             }
         }
     }

@@ -38,7 +38,7 @@ public interface BookingMapper {
     @Mapping(target = "pnrId", source = "pnr.id")
     @Mapping(target = "paymentId", source = "payment.id")
     @Mapping(target = "status", source = "booking.status")
-    @Mapping(target = "passengerCount", expression = "java(booking.bookingPassengers == null ? 0 : booking.bookingPassengers.size())")
+    @Mapping(target = "passengerCount", expression = "java(booking.getBookingPassengers() == null ? 0 : booking.getBookingPassengers().size())")
     BookingHistoryResponse toHistoryResponse(Booking booking, PNR pnr, Payment payment);
 
     default User map(Long userId) {
@@ -52,6 +52,6 @@ public interface BookingMapper {
     }
 
     default Long map(BookingPassenger bookingPassenger) {
-        return bookingPassenger == null ? null : bookingPassenger.id;
+        return bookingPassenger == null ? null : bookingPassenger.getId();
     }
 }

@@ -4,7 +4,9 @@ import com.railconnect.booking.dtorequestresponse.CreateBookingRequest;
 import com.railconnect.common.exception.InvalidRequestException;
 import com.railconnect.common.exception.ResourceNotFoundException;
 import com.railconnect.entity.Coach;
+import com.railconnect.entity.Schedule;
 import com.railconnect.entity.User;
+import com.railconnect.security.SecurityUtil;
 import com.railconnect.train.repository.CoachRepository;
 import com.railconnect.train.repository.ScheduleRepository;
 import com.railconnect.train.repository.TrainRepository;
@@ -30,15 +32,18 @@ public class BookingValidator {
     private final CoachRepository coachRepository;
     private final TrainRepository trainRepository;
     private final ScheduleRepository scheduleRepository;
+    private final SecurityUtil securityUtil;
 
     public BookingValidator(UserRepository userRepository,
                              CoachRepository coachRepository,
                              TrainRepository trainRepository,
-                             ScheduleRepository scheduleRepository) {
+                             ScheduleRepository scheduleRepository,
+                             SecurityUtil securityUtil) {
         this.userRepository = userRepository;
         this.coachRepository = coachRepository;
         this.trainRepository = trainRepository;
         this.scheduleRepository = scheduleRepository;
+        this.securityUtil = securityUtil;
     }
 
     /**
@@ -48,14 +53,16 @@ public class BookingValidator {
     public ValidatedBooking validate(CreateBookingRequest request) {
         User user = validateUser(request.userId());
         Coach coach = validateCoach(request.coachId());
-        validateTrain(coach);
-        validateSchedule(request.scheduleId());
+        Schedule schedule = validateSchedule(request.scheduleId());
+        validateTrainAndCoachMatchSchedule(coach, schedule);
         validateJourneyDate(request.journeyDate());
         validatePassengerCount(request.passengers().size());
         return new ValidatedBooking(user, coach);
     }
 
     public User validateUser(Long userId) {
+        // Enforce that the authenticated user owns this booking request or is an admin
+        securityUtil.verifyUserOwnershipOrAdmin(userId, "create a booking for this account");
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
     }
@@ -74,9 +81,16 @@ public class BookingValidator {
                 .orElseThrow(() -> new ResourceNotFoundException("Train", "id", coach.getTrain().getId()));
     }
 
-    public void validateSchedule(Long scheduleId) {
-        if (!scheduleRepository.existsById(scheduleId)) {
-            throw new ResourceNotFoundException("Schedule", "id", scheduleId);
+    public Schedule validateSchedule(Long scheduleId) {
+        return scheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Schedule", "id", scheduleId));
+    }
+
+    public void validateTrainAndCoachMatchSchedule(Coach coach, Schedule schedule) {
+        if (coach.getTrain() == null || schedule.getTrain() == null ||
+                !coach.getTrain().getId().equals(schedule.getTrain().getId())) {
+            throw new InvalidRequestException(
+                    "Selected coach " + coach.getCoachNumber() + " does not belong to the train for schedule " + schedule.getId());
         }
     }
 
